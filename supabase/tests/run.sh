@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------------------------
-# Corre las pruebas de RLS contra un Postgres local, sin Supabase ni Docker.
+# Pruebas de la base de datos, sin Supabase y sin Docker.
 #
 #   ./supabase/tests/run.sh
 #
-# Levanta un cluster efímero, emula lo mínimo de Supabase (roles anon /
-# authenticated / service_role, esquema auth, auth.uid()), aplica las
-# migraciones en orden y verifica 31 afirmaciones sobre las políticas.
+# Levanta un Postgres efímero, emula lo mínimo de Supabase (roles anon /
+# authenticated / service_role, esquema auth, auth.uid()), y corre cada juego
+# de pruebas contra una base RECIÉN CREADA, para que ninguno dependa del
+# estado que dejó el anterior.
 #
-# Requiere: postgresql-16 instalado. No toca tu proyecto de Supabase.
+# Requiere: postgresql-16 instalado.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -18,6 +19,7 @@ PGBIN="${PGBIN:-/usr/lib/postgresql/16/bin}"
 DATA="${PGDATA_TEST:-/var/lib/postgresql/coladb}"
 PORT="${PGPORT_TEST:-5433}"
 SOCK="${PGSOCK_TEST:-/tmp}"
+export PGPORT_TEST="$PORT" PGSOCK_TEST="$SOCK"
 
 psql_run() { psql -h "$SOCK" -p "$PORT" -U postgres -v ON_ERROR_STOP=1 "$@"; }
 
@@ -30,18 +32,28 @@ if ! psql_run -d postgres -c 'select 1' >/dev/null 2>&1; then
   sleep 2
 fi
 
-echo "==> base limpia"
-psql_run -d postgres -q -c "drop database if exists cola;" >/dev/null
-psql_run -d postgres -q -c "create database cola;" >/dev/null
+fresh_db() {
+  psql_run -d postgres -q -c "drop database if exists cola;" >/dev/null
+  psql_run -d postgres -q -c "create database cola;" >/dev/null
+  psql_run -d cola -q -f "$HERE/00_supabase_shim.sql"
+  for f in "$MIGRATIONS"/*.sql; do
+    psql_run -d cola -q -f "$f"
+  done
+}
 
-echo "==> emulando Supabase"
-psql_run -d cola -q -f "$HERE/00_supabase_shim.sql"
+echo "==> migraciones: $(ls "$MIGRATIONS" | wc -l) archivos"
 
-echo "==> aplicando migraciones"
-for f in "$MIGRATIONS"/*.sql; do
-  echo "    $(basename "$f")"
-  psql_run -d cola -q -f "$f"
+for suite in "$HERE"/0[12]_*.sql; do
+  echo
+  echo "==> $(basename "$suite")"
+  fresh_db
+  psql_run -d cola -f "$suite"
 done
 
-echo "==> pruebas de RLS"
-psql_run -d cola -f "$HERE/01_rls_tests.sql"
+echo
+echo "==> 03_concurrency.sh"
+fresh_db
+"$HERE/03_concurrency.sh"
+
+echo
+echo "Todo verde."

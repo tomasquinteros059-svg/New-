@@ -62,6 +62,31 @@ export type TaskEvent = {
   created_at: string;
 };
 
+/** Lo que devuelven claim_task y close_task. Ver migración 0004. */
+export type TaskActionCode =
+  | "claimed"
+  | "closed"
+  | "already_taken"
+  | "at_limit"
+  | "not_found"
+  | "not_active"
+  | "not_yours"
+  | "note_required"
+  | "note_too_long"
+  | "no_session"
+  | "no_profile";
+
+export type TaskActionResult = {
+  ok: boolean;
+  code: TaskActionCode;
+  /** Presentes solo en at_limit. */
+  active?: number;
+  limit?: number;
+  /** Presente en already_taken y not_active. */
+  status?: TaskStatus;
+  task_id?: string;
+};
+
 export type AppSettings = {
   id: boolean;
   stale_available_hours: number;
@@ -107,6 +132,8 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       is_supervisor: { Args: Record<string, never>; Returns: boolean };
+      claim_task: { Args: { p_task_id: string }; Returns: TaskActionResult };
+      close_task: { Args: { p_task_id: string; p_note: string }; Returns: TaskActionResult };
     };
     Enums: {
       app_role: AppRole;

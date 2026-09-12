@@ -8,6 +8,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const items = [
     { href: "/mis-tareas", label: "Mis tareas" },
+    { href: "/disponibles", label: "Disponibles" },
     ...(isSupervisor ? [{ href: "/equipo", label: "Equipo" }] : []),
     { href: "/cuenta", label: "Cuenta" },
   ];

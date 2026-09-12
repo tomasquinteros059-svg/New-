@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { PRIORITY_CLASS, PRIORITY_LABEL, formatDateTime } from "@/lib/format";
+import { PRIORITY_CLASS, PRIORITY_LABEL, formatDateTime, timeAgo } from "@/lib/format";
 import type { Task } from "@/lib/types";
 
-export function TaskCard({ task }: { task: Task }) {
+/**
+ * Tarjeta de la cola de disponibles.
+ *
+ * Muestra la antigüedad porque es el tercer criterio de orden: si no se ve, la
+ * lista parece arbitraria. La acción de tomar vive en el detalle, no acá: una
+ * cosa por pantalla, y tomar algo sin haberlo leído es cómo se sueltan tareas.
+ */
+export function AvailableTaskCard({ task }: { task: Task }) {
   return (
     <Link
       href={`/tarea/${task.id}`}
@@ -24,11 +31,8 @@ export function TaskCard({ task }: { task: Task }) {
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted">
+        <span>En cola {timeAgo(task.available_since)}</span>
         {task.due_at ? <span>Vence {formatDateTime(task.due_at)}</span> : null}
-        {task.assignment_kind === "assigned" ? (
-          <span className="font-medium text-brand-700">Te la asignaron</span>
-        ) : null}
-        {task.requires_evidence ? <span>Requiere evidencia</span> : null}
       </div>
     </Link>
   );

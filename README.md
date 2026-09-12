@@ -8,21 +8,26 @@ No es un ERP, no es un chat, no es un gestor de proyectos.
 
 ---
 
-## Estado: Fase 1 completa
+## Estado: Fases 1 y 2 completas
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | **1 — Base** | Proyecto, base de datos con RLS, autenticación, entrar y salir | ✅ |
-| 2 — Cola | Crear, listar por prioridad, tomar, cerrar | pendiente |
-| 3 — Capacidad | Límite activo, panel de carga del equipo | pendiente |
+| **2 — Cola** | Crear, listar por prioridad, tomar, cerrar | ✅ |
+| 3 — Capacidad | Panel de carga del equipo, asignación directa | pendiente |
 | 4 — Control | Soltar con motivo, evidencia, avisos de rescate | pendiente |
 
 **Criterio de la Fase 1**: dos usuarios distintos pueden iniciar sesión y cada
-uno ve solo lo suyo.
+uno ve solo lo suyo. → pruebas 20 a 24 de `01_rls_tests.sql`.
 
-Verificado con 31 afirmaciones automatizadas sobre las políticas de seguridad
-(`npm run test:db`), entre ellas que un trabajador no ve la tarea activa de otro
-ni consultando la API directamente.
+**Criterio de la Fase 2**: dos navegadores abiertos al mismo tiempo no pueden
+tomar la misma tarea, y el segundo recibe un mensaje claro. → prueba A de
+`03_concurrency.sh`, con procesos y transacciones de verdad.
+
+En total, `npm run test:db` corre **58 afirmaciones más 3 pruebas de
+concurrencia real**. El límite de tareas activas también está probado bajo
+concurrencia: seis pedidos simultáneos de la misma persona con tope 3 dejan
+exactamente 3.
 
 ---
 
@@ -106,12 +111,19 @@ npm run dev
 | `npm run build` | Compilación de producción |
 | `npm run typecheck` | TypeScript sin emitir |
 | `npm run lint` | ESLint |
-| `npm run test:db` | 31 pruebas de RLS contra un Postgres local |
+| `npm run test:db` | Pruebas de RLS, de tomar/cerrar y de concurrencia real |
 
 `npm run test:db` levanta un Postgres efímero, emula lo mínimo de Supabase
 (roles `anon`/`authenticated`/`service_role`, esquema `auth`, `auth.uid()`),
-aplica las migraciones y verifica las políticas. No toca tu proyecto de
-Supabase y no necesita Docker. Requiere `postgresql-16` instalado.
+y corre cada juego de pruebas contra una base recién creada:
+
+| Archivo | Qué prueba |
+|---|---|
+| `01_rls_tests.sql` | 31 afirmaciones sobre las políticas de seguridad |
+| `02_rpc_tests.sql` | 27 afirmaciones sobre tomar y cerrar |
+| `03_concurrency.sh` | Carreras reales: procesos y transacciones simultáneas |
+
+No toca tu proyecto de Supabase y no necesita Docker. Requiere `postgresql-16`.
 
 ---
 
@@ -127,10 +139,15 @@ src/
     auth/dal.ts            Data Access Layer: toda pantalla entra por acá
     types.ts               Tipos espejo del esquema
     format.ts              Fechas en America/Santiago, 24 horas
+    tz.ts                  Hora de pared -> UTC, con horario de verano
+    tasks/actions.ts       Tomar, cerrar y crear (Server Actions)
   app/
     login/                 Link mágico, sin contraseña
     auth/callback/         Intercambio del código por sesión (PKCE)
     (app)/mis-tareas/      Cola propia y capacidad
+    (app)/disponibles/     La cola, ordenada por prioridad
+    (app)/tarea/[id]/      Detalle, con tomar y cerrar
+    (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
 supabase/
@@ -184,9 +201,28 @@ editar su propia fila de `profiles`, pero un trigger le impide tocar `role` y
 ascenderte a supervisor".
 
 **Las transiciones de estado van por RPC, no por `UPDATE` desde el cliente.**
-El trabajador no tiene política de `UPDATE` sobre `tasks` a propósito: tomar,
-cerrar y soltar necesitan validar el límite y escribir el historial en el mismo
-paso. Eso se construye en la Fase 2.
+El trabajador no tiene política de `UPDATE` sobre `tasks` a propósito: tomar y
+cerrar validan el límite y escriben el historial en el mismo paso, dentro de
+una transacción. Ver `claim_task` y `close_task` en la migración 0004.
+
+**El límite de tareas activas se protege bloqueando el perfil, no contando.**
+`claim_task` toma un `for update` sobre la fila del perfil antes de contar. Sin
+ese bloqueo, seis pedidos simultáneos de la misma persona cuentan "0 activas"
+los seis, pasan el límite los seis, y la dejan con seis tareas. El orden de
+bloqueo es siempre perfil y después tarea, para que dos transacciones no se
+traben en espejo.
+
+**Llegar segundo no es un error.** `claim_task` devuelve `{ ok, code }` en vez
+de tirar excepción: `already_taken`, `at_limit` y `not_found` son resultados
+esperados y cada uno tiene su mensaje. `at_limit` se queda en la pantalla
+porque la acción para resolverlo está a un toque; `already_taken` te devuelve a
+la cola, ya sin esa tarea.
+
+**La fecha límite se interpreta en la zona de la operación.** El input
+`datetime-local` entrega una hora sin zona; leerla con `new Date()` usaría la
+del servidor, que en Vercel es UTC, y una fecha escrita a las 18:30 se
+guardaría cuatro horas corrida. Ver `src/lib/tz.ts`, que además contempla el
+cambio de horario de verano chileno.
 
 **X e Y son configurables.** Los umbrales de rescate viven en `app_settings`,
 no en el código, y solo un supervisor los cambia.
@@ -219,15 +255,18 @@ explícita. Cuando entre, necesita su propio juego de políticas sobre
 
 ---
 
-## Lo que sigue (Fase 2)
+## Lo que sigue (Fase 3)
 
-1. Funciones RPC `claim_task`, `close_task`, `release_task` en PL/pgSQL, con
-   validación del límite de tareas activas dentro de la misma transacción.
-2. Pantalla de tareas disponibles, ordenada por prioridad → fecha límite →
-   antigüedad.
-3. Pantalla de crear tarea (supervisor).
-4. Detalle de tarea con las acciones.
-5. Mensaje claro cuando alguien llega segundo a la misma tarea.
+1. Panel de carga del equipo: cuántas activas lleva cada uno contra su tope, y
+   quién está en turno.
+2. Asignación directa del supervisor a una persona (`assign_task`), con el
+   límite blando: avisa si se pasa, pero deja.
+3. La tarea asignada se muestra distinta de la tomada; el dato ya se guarda
+   (`assignment_kind`).
 
-Criterio para darla por cerrada: dos navegadores abiertos al mismo tiempo no
-pueden tomar la misma tarea, y el segundo recibe un mensaje que se entiende.
+Criterio para darla por cerrada: el supervisor ve de un vistazo quién está
+saturado y quién libre.
+
+**Todavía no se puede soltar una tarea.** Está en la Fase 4 junto con el motivo
+obligatorio y el historial de soltadas. Hasta entonces, una tarea tomada se
+cierra o la cierra el supervisor.

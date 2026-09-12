@@ -3,12 +3,18 @@ import { createClient } from "@/lib/supabase/server";
 import { TaskCard } from "@/components/task-card";
 import { EmptyState } from "@/components/empty-state";
 import { CapacityMeter } from "@/components/capacity-meter";
+import { Banner } from "@/components/banner";
 import type { Task } from "@/lib/types";
 
 export const metadata = { title: "Mis tareas · Relevo" };
 
-export default async function MisTareasPage() {
+export default async function MisTareasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aviso?: string }>;
+}) {
   const { userId, profile } = await requireSession();
+  const { aviso } = await searchParams;
   const supabase = await createClient();
 
   // RLS ya limita a lo propio. El filtro explícito es para no traer también
@@ -37,16 +43,19 @@ export default async function MisTareasPage() {
         </p>
       </header>
 
+      {aviso === "cerrada" ? (
+        <Banner tone="good">Tarea cerrada. Te quedó un cupo libre.</Banner>
+      ) : null}
+
       {/* Capacidad: derivada de contar, nunca de un contador guardado. */}
       <CapacityMeter used={used} limit={limit} />
 
       {error ? (
-        <p role="alert" className="rounded-card border border-high/25 bg-high-soft px-4 py-3 text-[0.9375rem] text-high">
-          No pudimos cargar tus tareas. Recargá la página.
-        </p>
+        <Banner tone="bad">No pudimos cargar tus tareas. Recargá la página.</Banner>
       ) : tasks.length === 0 ? (
         <EmptyState title="Sin tareas activas">
-          Cuando tomes una tarea o el supervisor te asigne alguna, va a aparecer acá.
+          Tomá algo de la cola de disponibles, o esperá a que el supervisor te asigne
+          trabajo.
         </EmptyState>
       ) : (
         <ul className="space-y-3">

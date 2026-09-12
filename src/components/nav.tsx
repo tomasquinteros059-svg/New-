@@ -7,7 +7,9 @@ type Item = { href: string; label: string };
 
 /**
  * Navegación inferior: el pulgar llega abajo, no arriba.
- * Máximo tres destinos — más que eso y deja de ser "una cosa por pantalla".
+ *
+ * Cuatro destinos como techo (el supervisor ve los cuatro). Las acciones no
+ * viven acá: crear una tarea es un botón dentro de la cola, no un destino.
  */
 export function Nav({ items }: { items: Item[] }) {
   const pathname = usePathname();
