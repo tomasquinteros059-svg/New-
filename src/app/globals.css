@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   RELEVO — sistema de diseño
+   =============================================================================
+   Tailwind v4 no usa tailwind.config.js: los tokens se declaran acá con @theme
+   y Tailwind genera las utilidades (bg-paper, text-ink, font-display...).
+
+   Criterio: la app se usa en un teléfono, muchas veces con luz de galpón o de
+   calle. Por eso fondo papel cálido en vez de blanco puro (menos encandilamiento),
+   tinta casi negra para contraste alto, y un solo color de acción — el naranja
+   señal — que nunca se usa de adorno: si es naranja, se toca.
+   ========================================================================== */
+
+@theme {
+  /* -- Tipografía --------------------------------------------------------- */
+  /* Archivo para títulos: grotesca industrial, con carácter, legible en chico. */
+  --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* -- Superficies -------------------------------------------------------- */
+  --color-paper: #f4f1ea;
+  --color-surface: #ffffff;
+  --color-sunken: #ebe7de;
+
+  /* -- Tinta -------------------------------------------------------------- */
+  --color-ink: #14171b;
+  --color-ink-soft: #464d57;
+  --color-muted: #6b7280;
+
+  /* -- Líneas ------------------------------------------------------------- */
+  --color-line: #e2dbcf;
+  --color-line-strong: #cdc4b3;
+
+  /* -- Marca: azul petróleo ---------------------------------------------- */
+  --color-brand-50: #eff5f9;
+  --color-brand-100: #d7e6ef;
+  --color-brand-300: #8fb8ce;
+  --color-brand-500: #2c6e8f;
+  --color-brand-700: #14465f;
+  --color-brand-900: #0a2b3b;
+
+  /* -- Señal: el color de la acción. Uno solo, y siempre significa "tocá". - */
+  --color-signal: #cf5320;
+  --color-signal-dark: #a33d15;
+  --color-signal-soft: #fbeee7;
+
+  /* -- Estado de la persona ---------------------------------------------- */
+  --color-free: #1d7a5f;
+  --color-free-soft: #e4f1ec;
+  --color-busy: #8a4b12;
+  --color-busy-soft: #f7ecdf;
+
+  /* -- Prioridad de la tarea --------------------------------------------- */
+  --color-high: #ad2318;
+  --color-high-soft: #fbeae8;
+  --color-medium: #a5510a;
+  --color-medium-soft: #fbf0e2;
+  --color-low: #4a5567;
+  --color-low-soft: #eef0f3;
+
+  /* -- Forma -------------------------------------------------------------- */
+  --radius-card: 0.875rem;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgb(20 23 27 / 0.05), 0 10px 26px -16px rgb(20 23 27 / 0.28);
+  --shadow-lifted: 0 2px 4px rgb(20 23 27 / 0.06), 0 18px 36px -20px rgb(20 23 27 / 0.35);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* El teclado del teléfono no debe empujar el layout. */
+    min-height: 100dvh;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* Foco visible siempre: se usa con guantes y con teclado. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Área táctil mínima cómoda en pantallas chicas. */
+  button, a[role="button"], [type="submit"] {
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: var(--radius-pill);
+    padding: 0.185rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: 0.01em;
+  }
+
+  /* Un botón primario por pantalla. Si hay dos, una de las dos acciones sobra. */
+  .btn-primary {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-card);
+    background-color: var(--color-signal);
+    padding: 0.875rem 1.25rem;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    transition: background-color 120ms ease, transform 120ms ease;
+  }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-signal-dark); }
+  .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .btn-quiet {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-line-strong);
+    background-color: var(--color-surface);
+    padding: 0.75rem 1.125rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    transition: background-color 120ms ease;
+  }
+  .btn-quiet:hover:not(:disabled) { background-color: var(--color-sunken); }
+  .btn-quiet:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .field {
+    width: 100%;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-line-strong);
+    background-color: var(--color-surface);
+    padding: 0.8125rem 0.9375rem;
+    font-size: 1rem; /* 16px: menos de eso, iOS hace zoom al enfocar. */
+    color: var(--color-ink);
+  }
+  .field::placeholder { color: var(--color-muted); }
+
+  .label {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+}
