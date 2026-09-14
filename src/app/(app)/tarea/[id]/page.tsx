@@ -2,6 +2,9 @@ import Link from "next/link";
 import { requireSession } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { ClaimForm, CloseForm } from "./task-actions";
+import { ReleaseForm } from "./release-form";
+import { EvidenceUploader } from "./evidence-uploader";
+import { EvidenceList } from "@/components/evidence-list";
 import { Banner } from "@/components/banner";
 import { TaskFacts, TaskHeading } from "@/components/task-facts";
 import { formatDateTime } from "@/lib/format";
@@ -103,16 +106,24 @@ export default async function TaskPage({
       ) : null}
 
       {task.status === "active" && (isMine || isSupervisor) ? (
-        <section className="space-y-4">
+        <section className="space-y-5">
           {!isMine ? (
             <Banner tone="info">
-              Esta tarea la tiene {assignee?.full_name ?? "otra persona"}. Podés cerrarla vos
-              porque sos supervisor; queda registrado quién la cerró.
+              Esta tarea la tiene {assignee?.full_name ?? "otra persona"}. Podés cerrarla o
+              soltarla vos porque sos supervisor; queda registrado quién lo hizo.
             </Banner>
           ) : null}
+
+          {task.requires_evidence ? <EvidenceUploader taskId={task.id} /> : null}
+
+          <EvidenceList taskId={task.id} />
+
           <CloseForm taskId={task.id} />
+          <ReleaseForm taskId={task.id} />
         </section>
       ) : null}
+
+      {task.status === "closed" ? <EvidenceList taskId={task.id} /> : null}
 
       <Link href={task.status === "available" ? "/disponibles" : "/mis-tareas"} className="btn-quiet w-full">
         Volver

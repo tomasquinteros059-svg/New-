@@ -47,6 +47,12 @@ export default async function MisTareasPage({
         <Banner tone="good">Tarea cerrada. Te quedó un cupo libre.</Banner>
       ) : null}
 
+      {aviso === "soltada" ? (
+        <Banner tone="info">
+          La soltaste. Volvió a la cola con tu motivo anotado.
+        </Banner>
+      ) : null}
+
       {/* Capacidad: derivada de contar, nunca de un contador guardado. */}
       <CapacityMeter used={used} limit={limit} />
 

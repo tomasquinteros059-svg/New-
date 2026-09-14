@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { PRIORITY_CLASS, PRIORITY_LABEL, formatDateTime, timeAgo } from "@/lib/format";
-import type { Task } from "@/lib/types";
+import type { QueueItem } from "@/lib/types";
+
+type CardTask = Pick<
+  QueueItem,
+  "id" | "title" | "description" | "priority" | "due_at" | "available_since"
+>;
 
 /**
  * Tarjeta de la cola de disponibles.
@@ -8,8 +13,12 @@ import type { Task } from "@/lib/types";
  * Muestra la antigüedad porque es el tercer criterio de orden: si no se ve, la
  * lista parece arbitraria. La acción de tomar vive en el detalle, no acá: una
  * cosa por pantalla, y tomar algo sin haberlo leído es cómo se sueltan tareas.
+ *
+ * `stale` marca las que pasaron el umbral X. Es la versión NO destructiva de
+ * "sube automáticamente de prioridad": la tarea salta al principio de la lista
+ * y se marca, pero la prioridad que puso el supervisor no se pisa.
  */
-export function AvailableTaskCard({ task }: { task: Task }) {
+export function AvailableTaskCard({ task, stale = false }: { task: CardTask; stale?: boolean }) {
   return (
     <Link
       href={`/tarea/${task.id}`}
@@ -19,8 +28,11 @@ export function AvailableTaskCard({ task }: { task: Task }) {
         <h3 className="font-display text-[1.0625rem] leading-snug font-semibold text-ink">
           {task.title}
         </h3>
-        <span className={`pill shrink-0 ${PRIORITY_CLASS[task.priority]}`}>
-          {PRIORITY_LABEL[task.priority]}
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`pill ${PRIORITY_CLASS[task.priority]}`}>
+            {PRIORITY_LABEL[task.priority]}
+          </span>
+          {stale ? <span className="pill bg-medium-soft text-medium">Estancada</span> : null}
         </span>
       </div>
 

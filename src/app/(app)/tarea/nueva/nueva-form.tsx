@@ -90,6 +90,26 @@ export function NuevaTareaForm({ timeZone }: { timeZone: string }) {
         </p>
       </div>
 
+      <div className="card p-4">
+        <label htmlFor="requires_evidence" className="flex items-start justify-between gap-4">
+          <span>
+            <span className="font-display text-[1.0625rem] font-semibold text-ink">
+              Pedir evidencia
+            </span>
+            <span className="mt-1 block text-sm leading-relaxed text-muted">
+              No se va a poder cerrar sin subir una foto o un archivo. Usalo cuando haga
+              falta poder mostrar que se hizo.
+            </span>
+          </span>
+          <input
+            id="requires_evidence"
+            name="requires_evidence"
+            type="checkbox"
+            className="mt-1 h-6 w-6 shrink-0 accent-[var(--color-signal)]"
+          />
+        </label>
+      </div>
+
       {state.status === "error" && state.message ? (
         <Banner tone="bad">{state.message}</Banner>
       ) : null}

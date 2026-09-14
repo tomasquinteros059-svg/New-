@@ -95,6 +95,11 @@ export async function closeTask(_prev: ActionState, formData: FormData): Promise
   switch (data.code) {
     case "note_required":
       return { status: "error", message: "Escribí qué hiciste, aunque sea una línea." };
+    case "evidence_required":
+      return {
+        status: "error",
+        message: "Esta tarea pide evidencia. Subí una foto o un archivo antes de cerrarla.",
+      };
     case "not_active":
       return { status: "error", message: "Esta tarea ya no está activa." };
     case "not_yours":
@@ -117,6 +122,7 @@ export async function createTask(_prev: ActionState, formData: FormData): Promis
   const description = String(formData.get("description") ?? "").trim();
   const priorityRaw = String(formData.get("priority") ?? "medium");
   const dueLocal = String(formData.get("due_at") ?? "").trim();
+  const requiresEvidence = formData.get("requires_evidence") === "on";
 
   if (title.length < 3 || title.length > 140) {
     return { status: "error", message: "El título tiene que tener entre 3 y 140 caracteres." };
@@ -142,6 +148,7 @@ export async function createTask(_prev: ActionState, formData: FormData): Promis
     description: description || undefined,
     priority,
     due_at: dueAt ?? undefined,
+    requires_evidence: requiresEvidence,
     created_by: userId,
   });
 
@@ -201,4 +208,98 @@ export async function assignTask(_prev: ActionState, formData: FormData): Promis
     default:
       return { status: "error", message: "No pudimos asignar la tarea. Probá de nuevo." };
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Soltar                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function releaseTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSession();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (reason.length < 3) {
+    return { status: "error", message: "Escribí por qué la soltás, aunque sea una línea." };
+  }
+  if (reason.length > 1000) {
+    return { status: "error", message: "El motivo es demasiado largo (máximo 1000 caracteres)." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("release_task", {
+    p_task_id: taskId,
+    p_reason: reason,
+  });
+
+  if (error || !data) {
+    return { status: "error", message: "No pudimos soltar la tarea. Probá de nuevo." };
+  }
+
+  if (data.ok) {
+    revalidatePath("/mis-tareas");
+    revalidatePath("/disponibles");
+    revalidatePath("/control");
+    redirect("/mis-tareas?aviso=soltada");
+  }
+
+  switch (data.code) {
+    case "reason_required":
+      return { status: "error", message: "Escribí por qué la soltás, aunque sea una línea." };
+    case "not_active":
+      return { status: "error", message: "Esta tarea ya no está activa." };
+    case "not_yours":
+      return { status: "error", message: "Esta tarea la tiene otra persona." };
+    default:
+      return { status: "error", message: "No pudimos soltar la tarea. Probá de nuevo." };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Rescate (supervisor)                                                        */
+/* -------------------------------------------------------------------------- */
+
+export async function acknowledgeAlert(formData: FormData): Promise<void> {
+  await requireSupervisor();
+  const alertId = Number(formData.get("alert_id"));
+
+  if (!Number.isInteger(alertId)) {
+    redirect("/control?aviso=error");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("acknowledge_alert", { p_alert_id: alertId });
+
+  if (error || !data?.ok) {
+    redirect("/control?aviso=error");
+  }
+
+  revalidatePath("/control");
+  revalidatePath("/", "layout");
+  redirect("/control");
+}
+
+/**
+ * Forzar el barrido a mano.
+ *
+ * El barrido programado (pg_cron, cada 15 minutos) es lo que cumple el criterio
+ * de la fase: el aviso aparece sin que nadie toque nada. Esto es solo la salida
+ * de emergencia para mirar ahora mismo, o para cuando todavía no se programó el
+ * cron. Si esta pantalla es el único modo de que aparezcan avisos, el cron no
+ * está andando.
+ */
+export async function sweepNow(): Promise<void> {
+  await requireSupervisor();
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("sweep_stale_tasks");
+
+  if (error || !data?.ok) {
+    redirect("/control?aviso=error");
+  }
+
+  revalidatePath("/control");
+  revalidatePath("/", "layout");
+  redirect("/control?aviso=revisado");
 }

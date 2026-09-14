@@ -8,14 +8,14 @@ No es un ERP, no es un chat, no es un gestor de proyectos.
 
 ---
 
-## Estado: Fases 1, 2 y 3 completas
+## Estado: las cuatro fases completas
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | **1 — Base** | Proyecto, base de datos con RLS, autenticación, entrar y salir | ✅ |
 | **2 — Cola** | Crear, listar por prioridad, tomar, cerrar | ✅ |
 | **3 — Capacidad** | Panel de carga del equipo, asignación directa | ✅ |
-| 4 — Control | Soltar con motivo, evidencia, avisos de rescate | pendiente |
+| **4 — Control** | Soltar con motivo, evidencia, avisos de rescate | ✅ |
 
 **Criterio de la Fase 1**: dos usuarios distintos pueden iniciar sesión y cada
 uno ve solo lo suyo. → pruebas 20 a 24 de `01_rls_tests.sql`.
@@ -27,7 +27,11 @@ tomar la misma tarea, y el segundo recibe un mensaje claro. → prueba A de
 **Criterio de la Fase 3**: el supervisor ve de un vistazo quién está saturado y
 quién libre. → los tres números del resumen en `/equipo`, sobre `team_load()`.
 
-En total, `npm run test:db` corre **89 afirmaciones más 5 pruebas de
+**Criterio de la Fase 4**: una tarea abandonada genera aviso sola, sin que nadie
+la toque. → pruebas 32 a 37 de `05_phase4_tests.sql`, donde se envejece una
+tarea sin que nadie interactúe y el barrido crea el aviso.
+
+En total, `npm run test:db` corre **155 afirmaciones más 5 pruebas de
 concurrencia real**. El límite de tareas activas está probado bajo concurrencia
 (seis pedidos simultáneos de la misma persona con tope 3 dejan exactamente 3), y
 también la carrera entre tomar y asignar sobre la misma tarea.
@@ -89,7 +93,20 @@ where id = (select id from auth.users where email = 'ana@tuempresa.cl');
 De ahí en adelante, un supervisor puede promover a otros desde la aplicación.
 El sistema no te deja quedarte sin ningún supervisor.
 
-### 5. Variables de entorno
+### 5. Programar el barrido de rescate
+
+En el SQL Editor, pegá y ejecutá `supabase/scheduled/pg_cron.sql`. Programa el
+barrido cada 15 minutos **dentro de la base de datos**.
+
+Sin este paso, la aplicación funciona igual pero los avisos de rescate no
+aparecen solos: el supervisor los tiene que pedir con el botón "Revisar ahora"
+de la pantalla Control. Si ése es el único modo en que aparecen avisos, el cron
+no está andando.
+
+No va con las migraciones porque `create extension pg_cron` necesita permisos
+que un Postgres local no tiene, y rompería `npm run test:db`.
+
+### 6. Variables de entorno
 
 ```bash
 cp .env.example .env.local
@@ -97,7 +114,7 @@ cp .env.example .env.local
 
 Completá `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
-### 6. Levantar
+### 7. Levantar
 
 ```bash
 npm install
@@ -125,6 +142,7 @@ y corre cada juego de pruebas contra una base recién creada:
 | `01_rls_tests.sql` | 31 afirmaciones sobre las políticas de seguridad |
 | `02_rpc_tests.sql` | 27 afirmaciones sobre tomar y cerrar |
 | `04_assign_tests.sql` | 31 afirmaciones sobre asignar y la carga del equipo |
+| `05_phase4_tests.sql` | 66 afirmaciones sobre soltar, evidencia, Storage y rescate |
 | `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
 
 No toca tu proyecto de Supabase y no necesita Docker. Requiere `postgresql-16`.
@@ -152,12 +170,14 @@ src/
     (app)/disponibles/     La cola, ordenada por prioridad
     (app)/tarea/[id]/      Detalle, con tomar y cerrar
     (app)/tarea/[id]/asignar/  Elegir a quién dársela (solo supervisor)
+    (app)/control/         Rescate y soltadas (solo supervisor)
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
 supabase/
   migrations/              Esquema, funciones, RLS
-  tests/                   Arnés de pruebas de RLS
+  scheduled/pg_cron.sql    Programar el barrido (se corre UNA vez, a mano)
+  tests/                   Arnés de pruebas
 ```
 
 ### Versiones fijadas
@@ -216,6 +236,41 @@ ese bloqueo, seis pedidos simultáneos de la misma persona cuentan "0 activas"
 los seis, pasan el límite los seis, y la dejan con seis tareas. El orden de
 bloqueo es siempre perfil y después tarea, para que dos transacciones no se
 traben en espejo.
+
+**El aviso de rescate tiene que existir aunque nadie mire.** Por eso hay una
+tabla `alerts` y un barrido que la llena, en vez de calcular los avisos cuando
+alguien abre la pantalla. El barrido es idempotente (correrlo diez veces deja lo
+mismo que correrlo una) y borra los avisos que dejaron de aplicar: la tabla es
+la foto de lo que pasa ahora, no un registro histórico. El historial ya vive en
+`task_events`.
+
+**El barrido corre con pg_cron, no con el cron de Vercel.** El plan Hobby de
+Vercel corre cron una vez por día, y los umbrales se miden en horas. pg_cron
+corre dentro de la base cada 15 minutos, sin HTTP y sin que la `service_role`
+key ande dando vueltas por variables de entorno.
+
+**La escalada de prioridad no pisa la prioridad.** La especificación pedía que
+una tarea vieja "suba automáticamente de prioridad". Hacerlo con un `UPDATE`
+perdería para siempre lo que decidió el supervisor, y una tarea que se toma y se
+suelta en círculo escalaría hasta 'alta' y se quedaría ahí. En vez de eso,
+`available_queue()` la pone primera en la lista y la marca "Estancada". Mismo
+efecto para quien mira, reversible, y sin ningún proceso corriendo.
+
+**El bucket de evidencia es privado.** Una foto de una avería puede mostrar una
+instalación, una patente o la cara de alguien. Se sirve con URLs firmadas de
+cinco minutos, y el permiso sale de la ruta: el primer segmento es el id de la
+tarea, y escribe quien tiene esa tarea activa. Un cast defensivo
+(`public.safe_uuid`) evita que una carpeta con nombre raro haga fallar la
+política — una política que revienta es una política que bloquea todo.
+
+**Subir evidencia son dos pasos y pueden romperse en el medio.** Si el archivo
+sube pero el registro falla, el archivo queda huérfano y NO cuenta como
+evidencia: la verdad es la fila en `task_evidence`. Es el lado seguro para
+fallar; al revés se podrían cerrar tareas con evidencia que no está.
+
+**Soltar está detrás de un paso extra.** El botón dice "No puedo con esta" y
+recién ahí aparece el campo del motivo. Si estuviera al lado de "Cerrar", se
+tocaría por error y el historial se llenaría de motivos vacíos.
 
 **El tope es duro para tomar y blando para asignar.** `claim_task` rebota con
 `at_limit`; `assign_task` entra igual y devuelve `over_limit` con los números.
@@ -278,18 +333,27 @@ explícita. Cuando entre, necesita su propio juego de políticas sobre
 
 ---
 
-## Lo que sigue (Fase 4)
+## Lo que NO está hecho
 
-1. `release_task`: soltar con motivo obligatorio. La tarea vuelve a la cola y
-   `available_since` se reinicia; el churn queda en el historial.
-2. Pantalla de historial de soltadas para el supervisor.
-3. Evidencia al cerrar: Supabase Storage con sus propias políticas sobre
-   `storage.objects`, rutas por tarea y URLs firmadas.
-4. Rescate de tareas olvidadas. Los umbrales ya están en `app_settings`; falta
-   decidir el mecanismo (ver más abajo).
+**Nada se probó contra un Supabase real.** Toda la lógica vive en Postgres y
+está probada contra Postgres 16, incluidas las políticas de Storage sobre un
+`storage.objects` emulado. Lo que no se pudo verificar sin un proyecto real es
+la subida de archivos de punta a punta: el navegador hablando con Storage. Es la
+primera cosa que hay que probar a mano.
 
-Criterio para darla por cerrada: una tarea abandonada genera aviso sola, sin que
-nadie la toque.
+**El aviso llega solo hasta la app, no hasta el teléfono.** El barrido genera el
+aviso sin que nadie toque nada, y el contador aparece en la navegación. Pero si
+el supervisor no abre la aplicación, no se entera. Un correo diario de resumen
+es el siguiente paso natural y entra justo en el cron gratis de Vercel, que
+corre una vez por día. Necesita una cuenta de envío de correo, así que es una
+decisión tuya, no mía.
 
-**Todavía no se puede soltar una tarea.** Hasta que llegue la Fase 4, una tarea
-tomada se cierra, o la cierra el supervisor.
+**No se pueden cancelar tareas desde la aplicación.** El estado `cancelled`
+existe en el modelo y el supervisor puede editar tareas, pero no hay pantalla
+para cancelar. Nadie lo pidió todavía.
+
+**Las habilidades siguen fuera.** Fue una decisión explícita al empezar: una
+cola única funciona, y las etiquetas se agregan después sin romper nada.
+
+**No hay modo oscuro.** La paleta está definida para luz alta, que es la
+condición de uso esperada.

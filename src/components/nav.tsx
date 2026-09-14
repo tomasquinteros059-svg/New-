@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string };
+type Item = { href: string; label: string; badge?: number };
 
 /**
  * Navegación inferior: el pulgar llega abajo, no arriba.
  *
  * Cuatro destinos como techo (el supervisor ve los cuatro). Las acciones no
  * viven acá: crear una tarea es un botón dentro de la cola, no un destino.
+ * La cuenta tampoco: se llega por el nombre, arriba a la derecha.
  */
 export function Nav({ items }: { items: Item[] }) {
   const pathname = usePathname();
@@ -28,7 +29,7 @@ export function Nav({ items }: { items: Item[] }) {
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-1 px-2 py-3 font-display text-[0.8125rem] font-semibold transition-colors ${
+                className={`flex flex-col items-center gap-1 px-1.5 py-3 font-display text-[0.8125rem] font-semibold transition-colors ${
                   active ? "text-signal" : "text-muted hover:text-ink-soft"
                 }`}
               >
@@ -38,7 +39,22 @@ export function Nav({ items }: { items: Item[] }) {
                     active ? "bg-signal" : "bg-transparent"
                   }`}
                 />
-                {item.label}
+                {/*
+                  El contador va EN LÍNEA y no posicionado en absoluto: sobre el
+                  último destino, un badge absoluto se sale de la pantalla y el
+                  navegador lo recorta.
+                */}
+                <span className="flex items-center gap-1.5">
+                  {item.label}
+                  {item.badge && item.badge > 0 ? (
+                    <span
+                      aria-label={`${item.badge} sin ver`}
+                      className="flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-signal px-1 text-[11px] leading-none font-bold text-white"
+                    >
+                      {item.badge > 9 ? "9+" : item.badge}
+                    </span>
+                  ) : null}
+                </span>
               </Link>
             </li>
           );

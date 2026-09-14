@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AvailableTaskCard } from "@/components/available-task-card";
 import { EmptyState } from "@/components/empty-state";
 import { Banner } from "@/components/banner";
-import type { Task } from "@/lib/types";
+import type { QueueItem } from "@/lib/types";
 
 export const metadata = { title: "Disponibles · Relevo" };
 
@@ -31,15 +31,14 @@ export default async function DisponiblesPage({
 
   // El orden de la especificación: prioridad, después vencimiento más cercano,
   // después antigüedad en cola. Hay un índice parcial que lo cubre exacto.
-  const { data, error } = await supabase
-    .from("tasks")
-    .select("*")
-    .eq("status", "available")
-    .order("priority", { ascending: false })
-    .order("due_at", { ascending: true, nullsFirst: false })
-    .order("available_since", { ascending: true });
+  // Todo el orden y la marca de estancada los resuelve Postgres: es donde viven
+  // las marcas de tiempo, y así no hay desfase de reloj con el servidor web.
+  const { data, error } = await supabase.rpc("available_queue");
 
-  const tasks: Task[] = data ?? [];
+  const tasks: QueueItem[] = data ?? [];
+  const estancadas = tasks.filter((t) => t.is_stale);
+  const staleHours = tasks[0]?.stale_after_hours;
+
   const notice = aviso && aviso in AVISOS ? AVISOS[aviso as keyof typeof AVISOS] : null;
 
   return (
@@ -54,6 +53,14 @@ export default async function DisponiblesPage({
       </header>
 
       {notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null}
+
+      {estancadas.length > 0 ? (
+        <Banner tone="warn">
+          {estancadas.length === 1
+            ? `Hay 1 tarea esperando hace más de ${staleHours} h. Está arriba de todo.`
+            : `Hay ${estancadas.length} tareas esperando hace más de ${staleHours} h. Están arriba de todo.`}
+        </Banner>
+      ) : null}
 
       {profile.role === "supervisor" ? (
         <Link href="/tarea/nueva" className="btn-primary">
@@ -73,7 +80,7 @@ export default async function DisponiblesPage({
         <ul className="space-y-3">
           {tasks.map((task) => (
             <li key={task.id}>
-              <AvailableTaskCard task={task} />
+              <AvailableTaskCard task={task} stale={task.is_stale} />
             </li>
           ))}
         </ul>

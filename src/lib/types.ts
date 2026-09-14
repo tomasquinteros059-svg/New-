@@ -73,6 +73,10 @@ export type TaskActionCode =
   | "not_yours"
   | "note_required"
   | "note_too_long"
+  | "released"
+  | "reason_required"
+  | "reason_too_long"
+  | "evidence_required"
   | "no_session"
   | "no_profile";
 
@@ -115,6 +119,79 @@ export type AssignResult =
       status?: TaskStatus;
     };
 
+export type TaskEvidence = {
+  id: string;
+  task_id: string;
+  uploaded_by: string;
+  /** Ruta dentro del bucket `evidence`: `<task_id>/<archivo>`. */
+  storage_path: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+};
+
+/** Una fila de la cola de disponibles. Ver available_queue() en la 0011. */
+export type QueueItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: TaskPriority;
+  due_at: string | null;
+  available_since: string;
+  requires_evidence: boolean;
+  /** Pasó el umbral X. Se calcula en Postgres, no en el servidor web. */
+  is_stale: boolean;
+  stale_after_hours: number;
+};
+
+export type AlertType = "stale_available" | "stale_active";
+
+export type OpenAlert = {
+  id: number;
+  task_id: string;
+  type: AlertType;
+  threshold_hours: number;
+  created_at: string;
+  acknowledged_at: string | null;
+  title: string;
+  priority: TaskPriority;
+  status: TaskStatus;
+  /** Desde cuándo está estancada: en cola, o en manos de alguien. */
+  stale_since: string;
+  assignee_name: string | null;
+};
+
+export type ReleaseEntry = {
+  id: number;
+  task_id: string;
+  title: string;
+  status: TaskStatus;
+  reason: string | null;
+  released_at: string;
+  actor_name: string | null;
+  subject_name: string | null;
+  /** Falso cuando el supervisor le sacó la tarea a alguien. */
+  self_released: boolean;
+};
+
+export type SweepResult =
+  | {
+      ok: true;
+      code: "swept";
+      created: number;
+      cleared: number;
+      stale_available_hours: number;
+      stale_active_hours: number;
+    }
+  | { ok: false; code: "not_supervisor" };
+
+export type SimpleResult = {
+  ok: boolean;
+  code: string;
+  count?: number;
+  status?: TaskStatus;
+};
+
 export type AppSettings = {
   id: boolean;
   stale_available_hours: number;
@@ -148,6 +225,27 @@ export type Database = {
         Update: Record<string, never>;
         Relationships: [];
       };
+      task_evidence: {
+        Row: TaskEvidence;
+        // Se registra con attach_evidence, nunca por INSERT directo.
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      alerts: {
+        Row: {
+          id: number;
+          task_id: string;
+          type: AlertType;
+          threshold_hours: number;
+          created_at: string;
+          acknowledged_at: string | null;
+          acknowledged_by: string | null;
+        };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
       app_settings: {
         Row: AppSettings;
         Insert: Record<string, never>;
@@ -167,6 +265,17 @@ export type Database = {
         Returns: AssignResult;
       };
       team_load: { Args: Record<string, never>; Returns: TeamMember[] };
+      release_task: { Args: { p_task_id: string; p_reason: string }; Returns: TaskActionResult };
+      attach_evidence: {
+        Args: { p_task_id: string; p_path: string; p_mime?: string; p_size?: number };
+        Returns: SimpleResult;
+      };
+      sweep_stale_tasks: { Args: Record<string, never>; Returns: SweepResult };
+      acknowledge_alert: { Args: { p_alert_id: number }; Returns: SimpleResult };
+      open_alerts: { Args: Record<string, never>; Returns: OpenAlert[] };
+      release_history: { Args: { p_limit?: number }; Returns: ReleaseEntry[] };
+      safe_uuid: { Args: { p: string }; Returns: string | null };
+      available_queue: { Args: Record<string, never>; Returns: QueueItem[] };
     };
     Enums: {
       app_role: AppRole;

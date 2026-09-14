@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { requireSession } from "@/lib/auth/dal";
+import { createClient } from "@/lib/supabase/server";
 import { Nav } from "@/components/nav";
 import { Wordmark } from "@/components/wordmark";
 
@@ -6,11 +8,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { profile } = await requireSession();
   const isSupervisor = profile.role === "supervisor";
 
+  // El contador de avisos sin ver es lo que hace que el rescate sirva: un aviso
+  // que solo se ve entrando a su pantalla no avisa nada.
+  let pendientes = 0;
+  if (isSupervisor) {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("alerts")
+      .select("*", { count: "exact", head: true })
+      .is("acknowledged_at", null);
+    pendientes = count ?? 0;
+  }
+
   const items = [
     { href: "/mis-tareas", label: "Mis tareas" },
     { href: "/disponibles", label: "Disponibles" },
-    ...(isSupervisor ? [{ href: "/equipo", label: "Equipo" }] : []),
-    { href: "/cuenta", label: "Cuenta" },
+    ...(isSupervisor
+      ? [
+          { href: "/equipo", label: "Equipo" },
+          { href: "/control", label: "Control", badge: pendientes },
+        ]
+      : []),
   ];
 
   return (
@@ -18,7 +36,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="border-b border-line bg-surface">
         <div className="mx-auto flex w-full max-w-md items-center justify-between px-5 py-3.5">
           <Wordmark compact />
-          <span className="flex items-center gap-2">
+          <Link
+            href="/cuenta"
+            className="flex items-center gap-2 rounded-pill px-2 py-1 -mr-2 transition-colors hover:bg-sunken"
+          >
             <span
               aria-hidden
               className={`h-2 w-2 rounded-full ${profile.is_present ? "bg-free" : "bg-line-strong"}`}
@@ -26,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-sm font-medium text-ink-soft">
               {profile.full_name.split(" ")[0]}
             </span>
-          </span>
+          </Link>
         </div>
       </header>
 
