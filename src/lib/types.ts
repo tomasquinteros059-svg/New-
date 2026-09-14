@@ -103,6 +103,31 @@ export type TeamMember = {
   oldest_active_at: string | null;
 };
 
+/** Lo que devuelven assign_task y reassign_task. */
+type AssignOk = {
+  over_limit: boolean;
+  not_present: boolean;
+  active: number;
+  limit: number;
+  assignee_name: string;
+};
+
+export type ReassignResult =
+  | ({ ok: true; code: "reassigned"; previous_name: string } & AssignOk)
+  | {
+      ok: false;
+      code:
+        | "no_session"
+        | "not_supervisor"
+        | "no_assignee"
+        | "not_found"
+        | "not_active"
+        | "same_person"
+        | "reason_required"
+        | "reason_too_long";
+      status?: TaskStatus;
+    };
+
 export type AssignResult =
   | {
       ok: true;
@@ -142,6 +167,43 @@ export type QueueItem = {
   /** Pasó el umbral X. Se calcula en Postgres, no en el servidor web. */
   is_stale: boolean;
   stale_after_hours: number;
+  /** Cuántas coinciden en total, antes del recorte por `p_limit`. */
+  total_count: number;
+};
+
+/** Una tarea activa de alguien, para el panel de equipo. */
+export type PersonTask = {
+  id: string;
+  title: string;
+  priority: TaskPriority;
+  due_at: string | null;
+  assigned_at: string;
+  assignment_kind: AssignmentKind;
+  requires_evidence: boolean;
+};
+
+export type DigestTask = {
+  id: string;
+  title: string;
+  priority: TaskPriority;
+  waiting_hours?: number;
+  open_hours?: number;
+  assignee?: string | null;
+};
+
+export type Digest = {
+  ok: true;
+  generated_at: string;
+  thresholds: { stale_available_hours: number; stale_active_hours: number };
+  totals: {
+    available: number;
+    active: number;
+    closed_last_24h: number;
+    released_last_24h: number;
+  };
+  stale_available: DigestTask[];
+  stale_active: DigestTask[];
+  over_limit: { name: string; active: number; limit: number }[];
 };
 
 export type AlertType = "stale_available" | "stale_active";
@@ -275,7 +337,16 @@ export type Database = {
       open_alerts: { Args: Record<string, never>; Returns: OpenAlert[] };
       release_history: { Args: { p_limit?: number }; Returns: ReleaseEntry[] };
       safe_uuid: { Args: { p: string }; Returns: string | null };
-      available_queue: { Args: Record<string, never>; Returns: QueueItem[] };
+      available_queue: {
+        Args: { p_search?: string | null; p_limit?: number };
+        Returns: QueueItem[];
+      };
+      person_tasks: { Args: { p_person_id: string }; Returns: PersonTask[] };
+      daily_digest: { Args: Record<string, never>; Returns: Digest | { ok: false; code: string } };
+      reassign_task: {
+        Args: { p_task_id: string; p_assignee_id: string; p_reason: string };
+        Returns: ReassignResult;
+      };
       ensure_profile: { Args: Record<string, never>; Returns: boolean };
       edit_task: {
         Args: {

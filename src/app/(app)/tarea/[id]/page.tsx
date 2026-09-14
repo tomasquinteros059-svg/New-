@@ -98,6 +98,14 @@ export default async function TaskPage({
         </Banner>
       ) : null}
 
+      {aviso === "reasignada" ? (
+        <Banner tone={tope || turno ? "warn" : "good"}>
+          Ahora la tiene {assignee?.full_name ?? "esa persona"}.
+          {tope ? " Quedó por encima de su tope." : ""}
+          {turno ? " Está fuera de turno, así que puede que no la vea hoy." : ""}
+        </Banner>
+      ) : null}
+
       {aviso === "editada" ? <Banner tone="good">Cambios guardados.</Banner> : null}
       {aviso === "sin-cambios" ? (
         <Banner tone="info">No cambiaste nada, así que no se guardó nada.</Banner>
@@ -136,6 +144,12 @@ export default async function TaskPage({
             </Link>
           ) : null}
         </div>
+      ) : null}
+
+      {isSupervisor && task.status === "active" ? (
+        <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet w-full">
+          Pasarle esta tarea a otro
+        </Link>
       ) : null}
 
       {isSupervisor && (task.status === "available" || task.status === "active") ? (

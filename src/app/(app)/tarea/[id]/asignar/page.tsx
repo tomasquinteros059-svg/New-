@@ -4,6 +4,7 @@ import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { TeamRow, loadState } from "@/components/team-row";
 import { AssignButton } from "./assign-button";
+import { ReassignForm } from "./reassign-form";
 import { Banner } from "@/components/banner";
 import { EmptyState } from "@/components/empty-state";
 import type { TeamMember, Task } from "@/lib/types";
@@ -32,12 +33,43 @@ export default async function AsignarPage({ params }: { params: Promise<{ id: st
 
   if (!task) redirect("/disponibles?aviso=no-existe");
 
-  // Solo se asigna lo que está en la cola. Si ya la agarró alguien, el detalle
-  // de la tarea lo explica mejor que esta pantalla.
-  if (task.status !== "available") redirect(`/tarea/${id}?aviso=ya-no-disponible`);
+  // Cerrada o cancelada no se asigna ni se pasa: el detalle lo explica mejor.
+  if (task.status !== "available" && task.status !== "active") {
+    redirect(`/tarea/${id}?aviso=ya-no-disponible`);
+  }
 
   const { data } = await supabase.rpc("team_load");
   const team: TeamMember[] = data ?? [];
+
+  // Una tarea que ya tiene dueño no se "asigna": se PASA de una persona a otra,
+  // sin volver a la cola en el medio. Es otra operación y otra pantalla.
+  if (task.status === "active") {
+    return (
+      <div className="space-y-6">
+        <header>
+          <p className="label">Pasar a otra persona</p>
+          <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
+            {task.title}
+          </h1>
+        </header>
+
+        <Banner tone="info">
+          No vuelve a la cola: pasa directo de una persona a la otra, así que nadie más
+          puede tomarla en el medio.
+        </Banner>
+
+        {team.length === 0 ? (
+          <EmptyState title="No hay a quién pasarla" />
+        ) : (
+          <ReassignForm taskId={task.id} team={team} currentHolderId={task.assignee_id} />
+        )}
+
+        <Link href={`/tarea/${task.id}`} className="btn-quiet w-full">
+          Cancelar
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

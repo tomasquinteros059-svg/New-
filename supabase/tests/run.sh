@@ -43,7 +43,7 @@ fresh_db() {
 
 echo "==> migraciones: $(ls "$MIGRATIONS" | wc -l) archivos"
 
-for suite in "$HERE"/0[1245678]_*.sql; do
+for suite in "$HERE"/0[1-9]_*.sql; do
   echo
   echo "==> $(basename "$suite")"
   fresh_db

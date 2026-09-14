@@ -414,3 +414,58 @@ export async function cancelTask(_prev: ActionState, formData: FormData): Promis
       return { status: "error", message: "No pudimos cancelar la tarea. Probá de nuevo." };
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Reasignar (supervisor)                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function reassignTask(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireSupervisor();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const assigneeId = String(formData.get("assignee_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (!assigneeId) {
+    return { status: "error", message: "Elegí a quién se la pasás." };
+  }
+  if (reason.length < 3) {
+    return { status: "error", message: "Escribí por qué la pasás, aunque sea una línea." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reassign_task", {
+    p_task_id: taskId,
+    p_assignee_id: assigneeId,
+    p_reason: reason,
+  });
+
+  if (error || !data) {
+    return { status: "error", message: "No pudimos pasar la tarea. Probá de nuevo." };
+  }
+
+  if (data.ok) {
+    revalidatePath("/equipo");
+    revalidatePath("/mis-tareas");
+    revalidatePath(`/tarea/${taskId}`);
+
+    const flags = new URLSearchParams({ aviso: "reasignada" });
+    if (data.over_limit) flags.set("tope", "1");
+    if (data.not_present) flags.set("turno", "1");
+    redirect(`/tarea/${taskId}?${flags.toString()}`);
+  }
+
+  switch (data.code) {
+    case "same_person":
+      return { status: "error", message: "Esa persona ya la tiene." };
+    case "not_active":
+      return { status: "error", message: "Esta tarea ya no está en manos de nadie." };
+    case "no_assignee":
+      return { status: "error", message: "Esa persona ya no tiene cuenta." };
+    default:
+      return { status: "error", message: "No pudimos pasar la tarea. Probá de nuevo." };
+  }
+}

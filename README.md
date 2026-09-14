@@ -31,9 +31,13 @@ quién libre. → los tres números del resumen en `/equipo`, sobre `team_load()
 la toque. → pruebas 32 a 37 de `05_phase4_tests.sql`, donde se envejece una
 tarea sin que nadie interactúe y el barrido crea el aviso.
 
-En total, `npm run test:db` corre **249 afirmaciones más 5 pruebas de
-concurrencia real**, incluido un escenario de punta a punta que recorre un día
-completo de operación. El límite de tareas activas está probado bajo concurrencia
+`npm test` corre todo: typecheck, lint, **12 pruebas de funciones puras** y
+**290 afirmaciones sobre la base más 5 pruebas de concurrencia real**, incluido
+un escenario de punta a punta que recorre un día completo de operación.
+
+Lo que no se puede automatizar sin un proyecto de Supabase real está en
+[`docs/prueba-manual.md`](docs/prueba-manual.md): veinte minutos de lista, una
+sola vez. El límite de tareas activas está probado bajo concurrencia
 (seis pedidos simultáneos de la misma persona con tope 3 dejan exactamente 3), y
 también la carrera entre tomar y asignar sobre la misma tarea.
 
@@ -126,7 +130,17 @@ cp .env.example .env.local
 
 Completá `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
-### 7. Levantar
+### 7. Resumen diario por correo (opcional)
+
+Si querés que el supervisor se entere sin abrir la app, en Vercel →
+Settings → Environment Variables cargá `CRON_SECRET`,
+`SUPABASE_SERVICE_ROLE_KEY` y las tres de Resend (ver `.env.example`).
+`vercel.json` ya programa la corrida diaria.
+
+Sin esto la aplicación funciona igual: los avisos siguen apareciendo dentro de
+la app, con su contador en la navegación.
+
+### 8. Levantar
 
 ```bash
 npm install
@@ -143,7 +157,9 @@ npm run dev
 | `npm run build` | Compilación de producción |
 | `npm run typecheck` | TypeScript sin emitir |
 | `npm run lint` | ESLint |
-| `npm run test:db` | Pruebas de RLS, de tomar/cerrar y de concurrencia real |
+| `npm test` | Todo lo de abajo, en orden |
+| `npm run test:unit` | Zona horaria y armado del correo (sin red ni base) |
+| `npm run test:db` | Pruebas de la base y de concurrencia real |
 
 `npm run test:db` levanta un Postgres efímero, emula lo mínimo de Supabase
 (roles `anon`/`authenticated`/`service_role`, esquema `auth`, `auth.uid()`),
@@ -158,6 +174,7 @@ y corre cada juego de pruebas contra una base recién creada:
 | `06_qa_regression.sql` | 14 afirmaciones sobre los defectos encontrados en el QA |
 | `07_e2e_scenario.sql` | Un día completo de operación, 48 pasos verificados |
 | `08_edit_cancel_tests.sql` | 32 afirmaciones sobre editar, cancelar y la publicación |
+| `09_reassign_search_digest.sql` | 41 afirmaciones sobre reasignar, buscar y el resumen |
 | `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
 
 `07_e2e_scenario.sql` narra lo que va pasando mientras verifica. Correrlo es la
@@ -192,6 +209,9 @@ src/
     (app)/ajustes/         Umbrales X e Y (solo supervisor)
     (app)/equipo/[id]/     Rol y tope de una persona (solo supervisor)
     (app)/tarea/[id]/editar/   Editar y cancelar (solo supervisor)
+    api/cron/resumen/      Resumen diario por correo (lo llama Vercel Cron)
+  lib/email/               Armado del correo (puro) y envío (un proveedor)
+docs/prueba-manual.md      Lo que hay que probar a mano contra Supabase
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
@@ -263,6 +283,31 @@ privilegio está revocado para el rol `authenticated` entero. Todo cambio pasa
 por una función que escribe su evento, así que el historial no tiene agujeros.
 Antes había una política amplia de supervisor que la aplicación no usaba y que
 permitía cambiar una tarea por la API sin dejar rastro.
+
+**El tiempo real tiene respaldo.** Si el canal no conecta —Realtime apagado, la
+red del galpón, un proxy que corta WebSockets— cae a refrescar cada 30
+segundos. Importa más de lo que parece: sin respaldo, un tiempo real que falla
+es PEOR que no tenerlo, porque nadie se entera de que la lista dejó de
+actualizarse.
+
+**El resumen diario se arma en un lado y se envía en otro.** `renderDigest()`
+recibe datos y devuelve texto: no sabe de correo, de red ni de proveedores, así
+que se puede probar sin ninguno de los tres. Cambiar de proveedor toca una sola
+función de veinte líneas.
+
+**`/api` queda fuera del proxy de sesión.** Esas rutas no tienen sesión de
+navegador y se autentican solas. Cuando estaban dentro, la ruta del resumen
+recibía un 307 al login y la tarea programada no corría nunca, sin un solo
+error a la vista.
+
+**El buscador no usa comodines.** Busca por posición de texto y no con
+`ILIKE '%...%'`: un `%` o un `_` tipeado por alguien actuaría como comodín y
+devolvería resultados que no pidió.
+
+**Reasignar no es soltar y volver a asignar.** La tarea pasa directo de una
+persona a la otra sin tocar la cola, así que nadie puede tomarla en el medio. Y
+NO se registra como soltada: ponerla en el historial de soltadas sería decir
+algo que no pasó.
 
 **El tiempo real no trae datos, solo avisa.** El cliente escucha los cambios de
 `tasks` y le pide a Next que vuelva a renderizar en el servidor. La pantalla
@@ -428,18 +473,16 @@ cola única funciona, y las etiquetas se agregan después sin romper nada.
 **No hay modo oscuro.** La paleta está definida para luz alta, que es la
 condición de uso esperada.
 
-**El tiempo real está escrito pero no probado contra Supabase.** El cliente se
-suscribe a los cambios de `tasks` y la tabla está en la publicación
-`supabase_realtime` (verificado). Lo que no se pudo verificar sin un proyecto
-real es la conexión en sí. Si falla, la aplicación funciona como antes: la lista
-queda vieja hasta recargar, y al tocar "Tomar" llega `already_taken`.
+**Tres cosas están escritas pero no probadas contra Supabase**: la subida de
+archivos, la conexión de tiempo real y el envío del correo. Las tres tienen su
+propia sección en [`docs/prueba-manual.md`](docs/prueba-manual.md). Las tres
+degradan sin romper nada: sin Storage no se cierra lo que pide evidencia, sin
+tiempo real la lista se refresca cada 30 segundos, y sin correo el resumen
+queda en los registros de Vercel.
 
-**No se puede reasignar una tarea activa de una persona a otra en un paso.** Hay
-que soltarla y volver a asignarla. Son dos acciones y las dos quedan en el
-historial, que discutiblemente es mejor que una sola.
+**No hay paginación de verdad en la cola**, hay un tope de 100 filas con el
+total a la vista y un buscador. Para treinta personas alcanza; para tres mil
+tareas abiertas, no.
 
-**El panel de equipo no muestra QUÉ tiene cada persona**, solo cuántas. Para ver
-el detalle hay que ir tarea por tarea.
-
-**No hay búsqueda ni paginación en la cola.** Con treinta tareas la pantalla se
-hace larga.
+**No hay notificaciones push.** El correo diario es lo más lejos que llega un
+aviso hoy.
