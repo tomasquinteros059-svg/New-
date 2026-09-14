@@ -31,8 +31,9 @@ quién libre. → los tres números del resumen en `/equipo`, sobre `team_load()
 la toque. → pruebas 32 a 37 de `05_phase4_tests.sql`, donde se envejece una
 tarea sin que nadie interactúe y el barrido crea el aviso.
 
-En total, `npm run test:db` corre **155 afirmaciones más 5 pruebas de
-concurrencia real**. El límite de tareas activas está probado bajo concurrencia
+En total, `npm run test:db` corre **212 afirmaciones más 5 pruebas de
+concurrencia real**, incluido un escenario de punta a punta que recorre un día
+completo de operación. El límite de tareas activas está probado bajo concurrencia
 (seis pedidos simultáneos de la misma persona con tope 3 dejan exactamente 3), y
 también la carrera entre tomar y asignar sobre la misma tarea.
 
@@ -77,6 +78,11 @@ En **Authentication → Providers → Email**: dejá habilitado *Email*, y desac
 supervisor.
 
 ### 4. Crear el primer supervisor
+
+> **El orden importa.** Las cuentas se crean DESPUÉS de aplicar las migraciones.
+> El trigger que arma el perfil se instala en el paso 2; una cuenta creada antes
+> queda sin perfil. La aplicación ahora se autocura si eso pasa
+> (`ensure_profile()`), pero es más limpio no provocarlo.
 
 Las cuentas se crean desde **Authentication → Users → Add user**. El trigger
 `on_auth_user_created` arma el perfil automáticamente, siempre con rol
@@ -143,7 +149,12 @@ y corre cada juego de pruebas contra una base recién creada:
 | `02_rpc_tests.sql` | 27 afirmaciones sobre tomar y cerrar |
 | `04_assign_tests.sql` | 31 afirmaciones sobre asignar y la carga del equipo |
 | `05_phase4_tests.sql` | 66 afirmaciones sobre soltar, evidencia, Storage y rescate |
+| `06_qa_regression.sql` | 14 afirmaciones sobre los defectos encontrados en el QA |
+| `07_e2e_scenario.sql` | Un día completo de operación, 43 pasos verificados |
 | `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
+
+`07_e2e_scenario.sql` narra lo que va pasando mientras verifica. Correrlo es la
+forma más rápida de entender cómo funciona la aplicación sin leer el código.
 
 No toca tu proyecto de Supabase y no necesita Docker. Requiere `postgresql-16`.
 
@@ -332,6 +343,37 @@ explícita. Cuando entre, necesita su propio juego de políticas sobre
 `storage.objects`.
 
 ---
+
+## Defectos encontrados en el QA y ya corregidos
+
+Un QA de las cuatro fases juntas encontró cuatro cosas que las pruebas por fase
+no veían. Las cuatro están arregladas y tienen prueba de regresión en
+`06_qa_regression.sql`.
+
+1. **Un correo con una sola letra antes de la arroba rompía el alta de usuario
+   entera.** `profiles.full_name` exige 2 caracteres y el trigger derivaba el
+   nombre de la parte local del correo sin mirar el largo: `a@empresa.cl`
+   producía `'a'`, violaba el CHECK, y como el trigger es AFTER INSERT la
+   excepción hacía fallar el INSERT en `auth.users`. El error no mencionaba el
+   nombre por ningún lado.
+
+2. **La evidencia se heredaba entre asignaciones.** Alguien tomaba una tarea que
+   pide evidencia, subía la foto y la soltaba; el siguiente la tomaba y la
+   cerraba sin subir nada, porque el chequeo solo miraba si la TAREA tenía
+   alguna evidencia. Ahora cuenta solo lo cargado desde que empezó la asignación
+   actual. La anterior no se borra y se muestra marcada "de un intento
+   anterior".
+
+3. **Quien subía evidencia dejaba de verla al soltar la tarea.** El permiso
+   salía solo de ser el asignado actual, y al soltar `assignee_id` queda en
+   null.
+
+4. **Una sesión válida sin perfil dejaba la app en un bucle de
+   redirecciones.** El DAL mandaba a `/login`, el proxy veía la sesión y
+   rebotaba a `/mis-tareas`, que volvía a `/login`. Pasaba de verdad si la
+   cuenta se creaba antes de aplicar las migraciones. Ahora `ensure_profile()`
+   repara el perfil solo, y si aun así no se puede, `/auth/salir` corta la
+   sesión en vez de girar en el vacío.
 
 ## Lo que NO está hecho
 

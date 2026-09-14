@@ -26,15 +26,37 @@ export const getSession = cache(async (): Promise<Session | null> => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user.id)
     .maybeSingle();
 
-  // Usuario autenticado sin perfil: solo pasa si el trigger de alta falló.
-  // Mejor tratarlo como sin sesión que renderizar media pantalla rota.
-  if (!profile) return null;
+  /*
+   * Sesión válida sin fila en `profiles`.
+   *
+   * Pasa de verdad: si alguien crea su usuario en el panel de Supabase ANTES
+   * de aplicar las migraciones, el trigger de alta todavía no existe y queda
+   * una cuenta huérfana. `ensure_profile()` la repara sola.
+   */
+  if (!profile) {
+    await supabase.rpc("ensure_profile");
+    ({ data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle());
+  }
+
+  /*
+   * Si ni siquiera así hay perfil, NO se puede devolver null y dejar que
+   * requireSession mande a /login: el proxy ve una sesión válida en /login y
+   * rebota a /mis-tareas, que vuelve a /login. Bucle infinito y pantalla de
+   * error del navegador, sin ninguna explicación.
+   *
+   * La única salida es cortar la sesión.
+   */
+  if (!profile) redirect("/auth/salir?motivo=perfil");
 
   return { userId: user.id, email: user.email ?? null, profile };
 });

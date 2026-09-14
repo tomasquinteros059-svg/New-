@@ -28,7 +28,9 @@ export default async function LoginPage({
         >
           {error === "expirado"
             ? "Ese enlace ya venció. Pedí uno nuevo."
-            : "No pudimos validar el enlace. Pedí uno nuevo."}
+            : error === "perfil"
+              ? "Tu cuenta existe pero le falta el perfil. Suele pasar cuando la cuenta se creó antes de instalar la base de datos. Pedí el enlace de nuevo; si vuelve a fallar, avisale al supervisor."
+              : "No pudimos validar el enlace. Pedí uno nuevo."}
         </p>
       ) : null}
 

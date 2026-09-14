@@ -116,14 +116,16 @@ export default async function TaskPage({
 
           {task.requires_evidence ? <EvidenceUploader taskId={task.id} /> : null}
 
-          <EvidenceList taskId={task.id} />
+          <EvidenceList taskId={task.id} since={task.assigned_at} />
 
           <CloseForm taskId={task.id} />
           <ReleaseForm taskId={task.id} />
         </section>
       ) : null}
 
-      {task.status === "closed" ? <EvidenceList taskId={task.id} /> : null}
+      {task.status === "closed" ? (
+        <EvidenceList taskId={task.id} since={task.assigned_at} />
+      ) : null}
 
       <Link href={task.status === "available" ? "/disponibles" : "/mis-tareas"} className="btn-quiet w-full">
         Volver

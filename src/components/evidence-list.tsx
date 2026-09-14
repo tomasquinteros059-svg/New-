@@ -9,7 +9,18 @@ import type { TaskEvidence } from "@/lib/types";
  * cinco minutos. Nada de URLs públicas adivinables: una foto de una avería
  * puede mostrar una instalación, una patente o la cara de alguien.
  */
-export async function EvidenceList({ taskId }: { taskId: string }) {
+export async function EvidenceList({
+  taskId,
+  since,
+}: {
+  taskId: string;
+  /**
+   * `assigned_at` de la asignación actual. Lo anterior a esta marca es de un
+   * intento previo y NO habilita el cierre: si no se distinguiera, quien toma
+   * una tarea soltada vería fotos ya cargadas y creería que puede cerrar.
+   */
+  since?: string | null;
+}) {
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -35,15 +46,14 @@ export async function EvidenceList({ taskId }: { taskId: string }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="label">
-        Evidencia ({items.length})
-      </h2>
+      <h2 className="label">Evidencia ({items.length})</h2>
 
       <ul className="grid grid-cols-2 gap-3">
         {items.map((item) => {
           const url = urlByPath.get(item.storage_path);
           const isImage = (item.mime_type ?? "").startsWith("image/");
           const name = item.storage_path.split("/").pop() ?? "archivo";
+          const previa = since ? new Date(item.created_at) < new Date(since) : false;
 
           return (
             <li key={item.id} className="card overflow-hidden">
@@ -73,7 +83,14 @@ export async function EvidenceList({ taskId }: { taskId: string }) {
                   )}
                 </div>
               )}
-              <p className="px-3 py-2 text-xs text-muted">{formatDateTime(item.created_at)}</p>
+              <p className="px-3 py-2 text-xs text-muted">
+                {formatDateTime(item.created_at)}
+                {previa ? (
+                  <span className="mt-0.5 block font-medium text-medium">
+                    De un intento anterior
+                  </span>
+                ) : null}
+              </p>
             </li>
           );
         })}

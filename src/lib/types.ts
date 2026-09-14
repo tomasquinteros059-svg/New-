@@ -276,6 +276,7 @@ export type Database = {
       release_history: { Args: { p_limit?: number }; Returns: ReleaseEntry[] };
       safe_uuid: { Args: { p: string }; Returns: string | null };
       available_queue: { Args: Record<string, never>; Returns: QueueItem[] };
+      ensure_profile: { Args: Record<string, never>; Returns: boolean };
     };
     Enums: {
       app_role: AppRole;

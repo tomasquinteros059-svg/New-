@@ -112,7 +112,8 @@ export function EvidenceUploader({ taskId }: { taskId: string }) {
       </label>
 
       <p className="text-sm leading-relaxed text-muted">
-        Esta tarea no se cierra sin una foto o un archivo. Hasta 25 MB.
+        Esta tarea no se cierra sin una foto o un archivo tuyo. Si ya hay
+        evidencia de un intento anterior, no cuenta. Hasta 25 MB.
       </p>
 
       {error ? <Banner tone="bad">{error}</Banner> : null}
