@@ -96,8 +96,10 @@ set role = 'supervisor'
 where id = (select id from auth.users where email = 'ana@tuempresa.cl');
 ```
 
-De ahí en adelante, un supervisor puede promover a otros desde la aplicación.
-El sistema no te deja quedarte sin ningún supervisor.
+Para promover a alguien más, o para cambiarle el tope de tareas, hoy hay que
+usar el mismo `update` desde el SQL Editor: **todavía no hay pantalla para
+eso**. Las reglas ya están (un supervisor puede hacerlo, un trabajador no, y no
+podés quedarte sin ningún supervisor); lo que falta es la interfaz.
 
 ### 5. Programar el barrido de rescate
 
@@ -399,3 +401,23 @@ cola única funciona, y las etiquetas se agregan después sin romper nada.
 
 **No hay modo oscuro.** La paleta está definida para luz alta, que es la
 condición de uso esperada.
+
+**No hay tiempo real.** Era parte de la justificación original de elegir
+Supabase, y quedó sin hacer. La cola no se actualiza sola: si alguien toma una
+tarea mientras vos mirás la lista, la seguís viendo hasta que navegues o
+recargues. Lo que evita que eso sea un problema serio es que el bloqueo está en
+la base de datos: al tocar "Tomar" recibís `already_taken` y la lista se
+actualiza. O sea, la consecuencia está manejada, pero la lista miente entre
+recarga y recarga.
+
+**No hay pantalla para cambiar el rol ni el tope de una persona.** Las reglas
+están en la base y las pruebas las cubren; falta la interfaz. Hoy se hace con
+un `update` en el SQL Editor.
+
+**No hay pantalla para cambiar X e Y.** `app_settings` es editable por un
+supervisor según RLS, y está probado, pero no hay dónde tocarlo salvo el SQL
+Editor.
+
+**No se pueden editar tareas ya creadas.** RLS lo permite para el supervisor y
+el tipo de evento `edited` existe en el modelo, pero nadie lo escribe y no hay
+formulario.
