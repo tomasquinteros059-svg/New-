@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Banner } from "@/components/banner";
 import { RealtimeTasks } from "@/components/realtime-tasks";
 import { SearchBox } from "@/components/search-box";
+import { Pager } from "@/components/pager";
 import type { QueueItem } from "@/lib/types";
 
 export const metadata = { title: "Disponibles · Relevo" };
@@ -29,10 +30,10 @@ const AVISOS = {
 export default async function DisponiblesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aviso?: string; q?: string }>;
+  searchParams: Promise<{ aviso?: string; q?: string; p?: string }>;
 }) {
   const { profile } = await requireSession();
-  const { aviso, q = "" } = await searchParams;
+  const { aviso, q = "", p = "1" } = await searchParams;
   const supabase = await createClient();
 
   // El orden de la especificación: prioridad, después vencimiento más cercano,
@@ -40,8 +41,13 @@ export default async function DisponiblesPage({
   // Todo el orden y la marca de estancada los resuelve Postgres: es donde viven
   // las marcas de tiempo, y así no hay desfase de reloj con el servidor web.
   const busqueda = q.trim();
+  const POR_PAGINA = 20;
+  const pagina = Math.max(1, Number.parseInt(p, 10) || 1);
+
   const { data, error } = await supabase.rpc("available_queue", {
     p_search: busqueda || null,
+    p_limit: POR_PAGINA,
+    p_offset: (pagina - 1) * POR_PAGINA,
   });
 
   const tasks: QueueItem[] = data ?? [];
@@ -69,7 +75,7 @@ export default async function DisponiblesPage({
 
       {notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null}
 
-      <SearchBox q={busqueda} total={total} mostrando={tasks.length} />
+      <SearchBox q={busqueda} total={total} mostrando={total} />
 
       {estancadas.length > 0 ? (
         <Banner tone="warn">
@@ -99,11 +105,18 @@ export default async function DisponiblesPage({
         <ul className="space-y-3">
           {tasks.map((task) => (
             <li key={task.id}>
-              <AvailableTaskCard task={task} stale={task.is_stale} />
+              <AvailableTaskCard
+                task={task}
+                stale={task.is_stale}
+                requiredSkills={task.required_skills}
+                meetsSkills={task.meets_skills}
+              />
             </li>
           ))}
         </ul>
       )}
+
+      <Pager page={pagina} pageSize={POR_PAGINA} total={total} q={busqueda} />
     </div>
   );
 }

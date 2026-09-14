@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { editTask, cancelTask, type ActionState } from "@/lib/tasks/actions";
 import { Banner } from "@/components/banner";
-import type { Task } from "@/lib/types";
+import { SkillPicker } from "@/components/skill-picker";
+import type { Skill, Task } from "@/lib/types";
 
 const INITIAL: ActionState = { status: "idle" };
 
@@ -21,11 +22,15 @@ export function EditarForm({
   task,
   dueLocal,
   estaActiva,
+  skills,
+  selected,
 }: {
   task: Task;
   /** `due_at` ya convertido a la hora de pared de la operación. */
   dueLocal: string;
   estaActiva: boolean;
+  skills: Skill[];
+  selected: string[];
 }) {
   const [state, action] = useActionState(editTask, INITIAL);
 
@@ -102,6 +107,19 @@ export function EditarForm({
           className="field"
         />
       </div>
+
+      {skills.length > 0 ? (
+        <SkillPicker
+          skills={skills}
+          selected={new Set(selected)}
+          label="Habilidades que exige"
+          help={
+            estaActiva
+              ? "Ojo: alguien ya la está haciendo. Agregar una habilidad que no tiene no se la saca, pero queda anotado."
+              : "Sin ninguna, la puede tomar cualquiera."
+          }
+        />
+      ) : null}
 
       <div className="card p-4">
         <label htmlFor="requires_evidence" className="flex items-start justify-between gap-4">

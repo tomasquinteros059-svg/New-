@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireSession, requireSupervisor } from "@/lib/auth/dal";
 import { wallTimeToUtcIso } from "@/lib/tz";
+import { saveTaskSkills } from "@/lib/skills/actions";
+import { avisar } from "@/lib/push/server";
 import { TIME_ZONE } from "@/lib/format";
 import type { TaskPriority } from "@/lib/types";
 
@@ -58,6 +60,15 @@ export async function claimTask(_prev: ActionState, formData: FormData): Promise
         message:
           `Ya tenés ${data.active} de ${data.limit} tareas activas. ` +
           `Cerrá alguna antes de tomar otra.`,
+      };
+
+    // Freno duro: la etiqueta dice qué hace falta saber para hacerla.
+    case "missing_skills":
+      return {
+        status: "error",
+        message:
+          `Esta tarea pide ${(data.missing ?? []).join(", ")}. ` +
+          `Si la sabés hacer, pedile al supervisor que te agregue la habilidad.`,
       };
 
     default:
@@ -150,18 +161,28 @@ export async function createTask(_prev: ActionState, formData: FormData): Promis
     return { status: "error", message: "Esa fecha límite no se entiende." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("tasks").insert({
-    title,
-    description: description || undefined,
-    priority,
-    due_at: dueAt ?? undefined,
-    requires_evidence: requiresEvidence,
-    created_by: userId,
-  });
+  const skillIds = formData.getAll("skill_id").map(String).filter(Boolean);
 
-  if (error) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      title,
+      description: description || undefined,
+      priority,
+      due_at: dueAt ?? undefined,
+      requires_evidence: requiresEvidence,
+      created_by: userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
     return { status: "error", message: "No pudimos crear la tarea. Probá de nuevo." };
+  }
+
+  if (skillIds.length > 0) {
+    await saveTaskSkills(data.id, skillIds);
   }
 
   revalidatePath("/disponibles");
@@ -189,6 +210,16 @@ export async function assignTask(_prev: ActionState, formData: FormData): Promis
   }
 
   if (data.ok) {
+    // Que se entere sin abrir la app: es el caso que justifica el push.
+    // Nunca lanza, así que una asignación exitosa no se cae si el teléfono
+    // está apagado.
+    await avisar([assigneeId], {
+      title: "Te asignaron una tarea",
+      body: "Entró a tu lista. Abrila para verla.",
+      url: `/tarea/${taskId}`,
+      tag: `tarea-${taskId}`,
+    });
+
     revalidatePath("/disponibles");
     revalidatePath("/equipo");
     revalidatePath(`/tarea/${taskId}`);
@@ -345,6 +376,8 @@ export async function editTask(_prev: ActionState, formData: FormData): Promise<
     return { status: "error", message: "Esa fecha límite no se entiende." };
   }
 
+  const skillIds = formData.getAll("skill_id").map(String).filter(Boolean);
+
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("edit_task", {
     p_task_id: taskId,
@@ -360,6 +393,10 @@ export async function editTask(_prev: ActionState, formData: FormData): Promise<
   }
 
   if (data.ok) {
+    // Las habilidades van aparte: set_task_skills escribe su propio evento con
+    // el antes y el después, igual que edit_task con los demás campos.
+    await saveTaskSkills(taskId, skillIds);
+
     revalidatePath("/disponibles");
     revalidatePath(`/tarea/${taskId}`);
     redirect(`/tarea/${taskId}?aviso=${data.code === "unchanged" ? "sin-cambios" : "editada"}`);
@@ -448,6 +485,13 @@ export async function reassignTask(
   }
 
   if (data.ok) {
+    await avisar([assigneeId], {
+      title: "Te pasaron una tarea",
+      body: `Venía de ${data.previous_name}. Abrila para verla.`,
+      url: `/tarea/${taskId}`,
+      tag: `tarea-${taskId}`,
+    });
+
     revalidatePath("/equipo");
     revalidatePath("/mis-tareas");
     revalidatePath(`/tarea/${taskId}`);

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { renderDigest } from "@/lib/email/digest";
 import { enviarCorreo } from "@/lib/email/send";
+import { avisar } from "@/lib/push/server";
 import { TIME_ZONE } from "@/lib/format";
 import type { Digest } from "@/lib/types";
 
@@ -54,6 +55,31 @@ export async function GET(request: NextRequest) {
   const envio = await enviarCorreo(correo);
 
   /*
+   * Y un aviso al teléfono de los supervisores, pero SOLO si hay algo atrasado.
+   * Un push diario que dice "todo en orden" se silencia a la semana, y con él
+   * se silencian los que sí importan.
+   */
+  const atrasos = digest.stale_available.length + digest.stale_active.length;
+  let push = { enviados: 0, fallidos: 0 } as Awaited<ReturnType<typeof avisar>>;
+
+  if (atrasos > 0) {
+    const { data: supervisores } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("role", "supervisor");
+
+    push = await avisar(
+      (supervisores ?? []).map((s) => s.id),
+      {
+        title: atrasos === 1 ? "1 tarea atrasada" : `${atrasos} tareas atrasadas`,
+        body: "Nadie las toma o nadie las cierra. Tocá para verlas.",
+        url: "/control",
+        tag: "resumen-diario",
+      },
+    );
+  }
+
+  /*
    * El resumen vuelve en la respuesta aunque el correo no se haya enviado. Así
    * la tarea programada sirve desde el primer día: los registros de Vercel
    * muestran qué está atrasado aunque todavía no haya cuenta de correo.
@@ -61,6 +87,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     envio,
+    push,
     asunto: correo.subject,
     resumen: {
       totales: digest.totals,

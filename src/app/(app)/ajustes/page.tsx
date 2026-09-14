@@ -41,9 +41,14 @@ export default async function AjustesPage() {
         los valores nuevos.
       </p>
 
-      <Link href="/control" className="btn-quiet w-full">
-        Volver a Control
-      </Link>
+      <div className="space-y-3 border-t border-line pt-6">
+        <Link href="/habilidades" className="btn-quiet w-full">
+          Administrar habilidades
+        </Link>
+        <Link href="/control" className="btn-quiet w-full">
+          Volver a Control
+        </Link>
+      </div>
     </div>
   );
 }

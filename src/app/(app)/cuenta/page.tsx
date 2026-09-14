@@ -1,5 +1,7 @@
 import { requireSession } from "@/lib/auth/dal";
 import { CuentaForm } from "./cuenta-form";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { PushToggle } from "@/components/push-toggle";
 import { signOut } from "./actions";
 
 export const metadata = { title: "Cuenta · Relevo" };
@@ -15,6 +17,14 @@ export default async function CuentaPage() {
       </header>
 
       <CuentaForm fullName={profile.full_name} isPresent={profile.is_present} />
+
+      <div className="border-t border-line pt-5">
+        <PushToggle />
+      </div>
+
+      <div className="border-t border-line pt-5">
+        <ThemeToggle />
+      </div>
 
       <div className="border-t border-line pt-5">
         <dl className="space-y-2 text-[0.9375rem]">

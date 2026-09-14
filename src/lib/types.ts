@@ -74,6 +74,7 @@ export type TaskActionCode =
   | "note_required"
   | "note_too_long"
   | "released"
+  | "missing_skills"
   | "reason_required"
   | "reason_too_long"
   | "evidence_required"
@@ -83,6 +84,8 @@ export type TaskActionCode =
 export type TaskActionResult = {
   ok: boolean;
   code: TaskActionCode;
+  /** Presente solo en missing_skills. */
+  missing?: string[];
   /** Presentes solo en at_limit. */
   active?: number;
   limit?: number;
@@ -101,12 +104,15 @@ export type TeamMember = {
   /** Derivado de contar tareas activas. Puede superar el tope si se asignó. */
   active_count: number;
   oldest_active_at: string | null;
+  skills: string[];
 };
 
 /** Lo que devuelven assign_task y reassign_task. */
 type AssignOk = {
   over_limit: boolean;
   not_present: boolean;
+  /** Etiquetas que la tarea exige y esta persona no tiene. Asignar es blando. */
+  missing_skills: string[];
   active: number;
   limit: number;
   assignee_name: string;
@@ -169,6 +175,16 @@ export type QueueItem = {
   stale_after_hours: number;
   /** Cuántas coinciden en total, antes del recorte por `p_limit`. */
   total_count: number;
+  /** Etiquetas que la tarea exige. Vacío = la puede tomar cualquiera. */
+  required_skills: string[];
+  /** Si quien consulta las cumple todas. */
+  meets_skills: boolean;
+};
+
+export type Skill = {
+  id: string;
+  name: string;
+  created_at: string;
 };
 
 /** Una tarea activa de alguien, para el panel de equipo. */
@@ -308,6 +324,46 @@ export type Database = {
         Update: Record<string, never>;
         Relationships: [];
       };
+      skills: {
+        Row: Skill;
+        Insert: { name: string };
+        Update: { name?: string };
+        Relationships: [];
+      };
+      profile_skills: {
+        Row: { profile_id: string; skill_id: string };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      task_skills: {
+        Row: { task_id: string; skill_id: string };
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          profile_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          label: string | null;
+          created_at: string;
+          last_ok_at: string | null;
+          failures: number;
+        };
+        Insert: {
+          profile_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          label?: string | null;
+        };
+        Update: { last_ok_at?: string | null; failures?: number };
+        Relationships: [];
+      };
       app_settings: {
         Row: AppSettings;
         Insert: Record<string, never>;
@@ -338,9 +394,17 @@ export type Database = {
       release_history: { Args: { p_limit?: number }; Returns: ReleaseEntry[] };
       safe_uuid: { Args: { p: string }; Returns: string | null };
       available_queue: {
-        Args: { p_search?: string | null; p_limit?: number };
+        Args: { p_search?: string | null; p_limit?: number; p_offset?: number };
         Returns: QueueItem[];
       };
+      set_task_skills: { Args: { p_task_id: string; p_skill_ids: string[] }; Returns: SimpleResult };
+      set_profile_skills: {
+        Args: { p_profile_id: string; p_skill_ids: string[] };
+        Returns: SimpleResult;
+      };
+      missing_skill_names: { Args: { p_user: string; p_task: string }; Returns: string[] };
+      task_skill_names: { Args: { p_task_id: string }; Returns: string[] };
+      has_required_skills: { Args: { p_user: string; p_task: string }; Returns: boolean };
       person_tasks: { Args: { p_person_id: string }; Returns: PersonTask[] };
       daily_digest: { Args: Record<string, never>; Returns: Digest | { ok: false; code: string } };
       reassign_task: {

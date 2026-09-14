@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EditarForm, CancelarForm } from "./editar-form";
 import { utcIsoToWallTime } from "@/lib/tz";
 import { TIME_ZONE } from "@/lib/format";
-import type { Task } from "@/lib/types";
+import type { Skill, Task } from "@/lib/types";
 
 export const metadata = { title: "Editar tarea · Relevo" };
 
@@ -31,6 +31,13 @@ export default async function EditarTareaPage({
 
   const estaActiva = task.status === "active";
 
+  const [{ data: catalogo }, { data: exigidas }] = await Promise.all([
+    supabase.from("skills").select("*").order("name"),
+    supabase.from("task_skills").select("skill_id").eq("task_id", id),
+  ]);
+  const skills: Skill[] = catalogo ?? [];
+  const seleccion = (exigidas ?? []).map((f) => f.skill_id);
+
   return (
     <div className="space-y-6">
       <header>
@@ -47,6 +54,8 @@ export default async function EditarTareaPage({
         task={task}
         dueLocal={utcIsoToWallTime(task.due_at, TIME_ZONE)}
         estaActiva={estaActiva}
+        skills={skills}
+        selected={seleccion}
       />
 
       <div className="border-t border-line pt-6">

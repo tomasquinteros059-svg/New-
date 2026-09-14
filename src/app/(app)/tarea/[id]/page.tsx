@@ -55,6 +55,20 @@ export default async function TaskPage({
   const isSupervisor = profile.role === "supervisor";
 
   /*
+   * Qué habilidades exige, y cuáles le faltan a quien mira. Si le faltan, el
+   * botón de tomar no aparece: aparece la explicación de qué le falta, que es
+   * accionable (pedirle al supervisor que se la agregue) mientras que un botón
+   * que rebota no lo es.
+   */
+  const [{ data: exigidas }, { data: faltantes }] = await Promise.all([
+    supabase.rpc("task_skill_names", { p_task_id: task.id }),
+    supabase.rpc("missing_skill_names", { p_user: userId, p_task: task.id }),
+  ]);
+
+  const requeridas: string[] = exigidas ?? [];
+  const faltan: string[] = faltantes ?? [];
+
+  /*
    * Si está cancelada, el motivo es lo único que le explica a quien la tenía
    * por qué le desapareció de la lista. Vive en el historial, y RLS deja que
    * lo vea porque figura como subject del evento.
@@ -125,6 +139,26 @@ export default async function TaskPage({
 
       <TaskFacts task={task} isMine={isMine} assigneeName={assignee?.full_name} />
 
+      {requeridas.length > 0 ? (
+        <section className="space-y-2">
+          <h2 className="label">Habilidades que pide</h2>
+          <div className="flex flex-wrap gap-2">
+            {requeridas.map((nombre) => {
+              const falta = faltan.includes(nombre);
+              return (
+                <span
+                  key={nombre}
+                  className={`pill ${falta ? "bg-high-soft text-high" : "bg-free-soft text-free"}`}
+                >
+                  {nombre}
+                  {falta ? " · te falta" : ""}
+                </span>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
       {task.status === "closed" ? (
         <section className="card p-4">
           <h2 className="label">Nota de cierre</h2>
@@ -135,9 +169,16 @@ export default async function TaskPage({
         </section>
       ) : null}
 
+      {task.status === "available" && faltan.length > 0 ? (
+        <Banner tone="warn">
+          No podés tomar esta tarea: te falta {faltan.join(", ")}. Si la sabés hacer,
+          pedile al supervisor que te agregue la habilidad.
+        </Banner>
+      ) : null}
+
       {task.status === "available" ? (
         <div className="space-y-3">
-          <ClaimForm taskId={task.id} />
+          {faltan.length === 0 ? <ClaimForm taskId={task.id} /> : null}
           {isSupervisor ? (
             <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet w-full">
               Asignar a alguien

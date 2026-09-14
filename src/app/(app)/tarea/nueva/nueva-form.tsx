@@ -4,6 +4,8 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { createTask, type ActionState } from "@/lib/tasks/actions";
 import { Banner } from "@/components/banner";
+import { SkillPicker } from "@/components/skill-picker";
+import type { Skill } from "@/lib/types";
 
 const INITIAL: ActionState = { status: "idle" };
 
@@ -16,7 +18,7 @@ function Submit() {
   );
 }
 
-export function NuevaTareaForm({ timeZone }: { timeZone: string }) {
+export function NuevaTareaForm({ timeZone, skills }: { timeZone: string; skills: Skill[] }) {
   const [state, action] = useActionState(createTask, INITIAL);
 
   return (
@@ -89,6 +91,15 @@ export function NuevaTareaForm({ timeZone }: { timeZone: string }) {
           prioridad, es lo que decide el orden de la cola.
         </p>
       </div>
+
+      {skills.length > 0 ? (
+        <SkillPicker
+          skills={skills}
+          selected={new Set()}
+          label="Habilidades que exige"
+          help="Sin ninguna, la puede tomar cualquiera. Con alguna, solo quien las tenga todas."
+        />
+      ) : null}
 
       <div className="card p-4">
         <label htmlFor="requires_evidence" className="flex items-start justify-between gap-4">

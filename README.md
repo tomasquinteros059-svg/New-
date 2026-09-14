@@ -32,7 +32,7 @@ la toque. → pruebas 32 a 37 de `05_phase4_tests.sql`, donde se envejece una
 tarea sin que nadie interactúe y el barrido crea el aviso.
 
 `npm test` corre todo: typecheck, lint, **12 pruebas de funciones puras** y
-**290 afirmaciones sobre la base más 5 pruebas de concurrencia real**, incluido
+**318 afirmaciones sobre la base más 5 pruebas de concurrencia real**, incluido
 un escenario de punta a punta que recorre un día completo de operación.
 
 Lo que no se puede automatizar sin un proyecto de Supabase real está en
@@ -140,7 +140,22 @@ Settings → Environment Variables cargá `CRON_SECRET`,
 Sin esto la aplicación funciona igual: los avisos siguen apareciendo dentro de
 la app, con su contador en la navegación.
 
-### 8. Levantar
+### 8. Avisos al teléfono (opcional)
+
+Generá el par de claves una vez:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Cargá `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y
+`VAPID_CONTACT_EMAIL` en Vercel. Cada persona enciende los avisos desde
+**Cuenta**, en cada teléfono.
+
+Sin esto la sección de avisos aparece diciendo que no están configurados, y
+todo lo demás funciona igual.
+
+### 9. Levantar
 
 ```bash
 npm install
@@ -175,6 +190,7 @@ y corre cada juego de pruebas contra una base recién creada:
 | `07_e2e_scenario.sql` | Un día completo de operación, 48 pasos verificados |
 | `08_edit_cancel_tests.sql` | 32 afirmaciones sobre editar, cancelar y la publicación |
 | `09_reassign_search_digest.sql` | 41 afirmaciones sobre reasignar, buscar y el resumen |
+| `10_skills_tests.sql` | 28 afirmaciones sobre habilidades y paginación |
 | `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
 
 `07_e2e_scenario.sql` narra lo que va pasando mientras verifica. Correrlo es la
@@ -207,10 +223,13 @@ src/
     (app)/tarea/[id]/asignar/  Elegir a quién dársela (solo supervisor)
     (app)/control/         Rescate y soltadas (solo supervisor)
     (app)/ajustes/         Umbrales X e Y (solo supervisor)
+    (app)/habilidades/     Catálogo de etiquetas (solo supervisor)
     (app)/equipo/[id]/     Rol y tope de una persona (solo supervisor)
     (app)/tarea/[id]/editar/   Editar y cancelar (solo supervisor)
     api/cron/resumen/      Resumen diario por correo (lo llama Vercel Cron)
   lib/email/               Armado del correo (puro) y envío (un proveedor)
+  lib/push/                Avisos al teléfono y suscripciones
+public/sw.js               Service worker: recibe los avisos y abre la pantalla
 docs/prueba-manual.md      Lo que hay que probar a mano contra Supabase
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
@@ -283,6 +302,39 @@ privilegio está revocado para el rol `authenticated` entero. Todo cambio pasa
 por una función que escribe su evento, así que el historial no tiene agujeros.
 Antes había una política amplia de supervisor que la aplicación no usaba y que
 permitía cambiar una tarea por la API sin dejar rastro.
+
+**Las habilidades son etiquetas, sin niveles.** Una tarea sin etiquetas la toma
+cualquiera; con etiquetas, solo quien las tenga TODAS. Si mañana importa
+distinguir junior de senior, esto NO alcanza: un nivel no es una etiqueta más,
+es un orden, y cambia la pregunta de «la tiene o no» a «le alcanza o no».
+
+**Las tareas que no podés tomar NO se esconden, se marcan.** Si se escondieran,
+nadie sabría que hay trabajo esperando a alguien con esa etiqueta, que es
+justamente lo que el supervisor necesita ver.
+
+**La habilidad frena antes que el tope.** Si a alguien le falta la etiqueta Y
+además está al límite, el mensaje habla de la etiqueta: decirle que está al tope
+lo mandaría a cerrar tareas para después chocar contra otra pared.
+
+**Borrar una habilidad en uso está prohibido, no en cascada.** Borrarla en
+cascada cambiaría en silencio quién puede tomar esa tarea.
+
+**El tema se guarda en el dispositivo, no en la cuenta.** La misma persona puede
+querer claro en el teléfono del galpón y oscuro en el de su casa. Un script
+inline lo aplica antes de pintar: sin eso, quien eligió oscuro ve un fogonazo
+blanco en cada carga.
+
+**El push nunca voltea la acción que lo disparó.** Si asignar funcionó, asignar
+funcionó, aunque el teléfono esté apagado. Las suscripciones muertas (404 o 410)
+se borran solas: guardarlas sería acumular basura que falla para siempre.
+
+**Nadie lee los endpoints de push de otro, ni el supervisor.** Son credenciales:
+quien las tiene puede mandarle notificaciones a esa persona. Las lee el servidor
+con la service_role key al momento de enviar.
+
+**El push diario solo sale si hay algo atrasado.** Un aviso diario que dice que
+todo está en orden se silencia a la semana, y con él se silencian los que sí
+importan.
 
 **El tiempo real tiene respaldo.** Si el canal no conecta —Realtime apagado, la
 red del galpón, un proxy que corta WebSockets— cae a refrescar cada 30
@@ -480,9 +532,14 @@ degradan sin romper nada: sin Storage no se cierra lo que pide evidencia, sin
 tiempo real la lista se refresca cada 30 segundos, y sin correo el resumen
 queda en los registros de Vercel.
 
-**No hay paginación de verdad en la cola**, hay un tope de 100 filas con el
-total a la vista y un buscador. Para treinta personas alcanza; para tres mil
-tareas abiertas, no.
+**Las notificaciones salen sin ícono propio.** En Android se ve el ícono
+genérico del navegador. Es cosmético: falta un PNG de 192x192 en `public/`.
 
-**No hay notificaciones push.** El correo diario es lo más lejos que llega un
-aviso hoy.
+**El push avisa de asignaciones y del resumen diario, no de todo.** No avisa
+cuando entra una tarea a la cola: eso le llegaría a todo el mundo todo el
+tiempo y terminaría silenciado.
+
+**Las habilidades no tienen niveles**, por decisión. Ver arriba.
+
+**El buscador busca en título y descripción**, no en habilidades ni en notas de
+cierre.

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { TeamRow } from "@/components/team-row";
@@ -50,6 +51,10 @@ export default async function EquipoPage({
           ))}
         </ul>
       )}
+
+      <Link href="/habilidades" className="btn-quiet w-full">
+        Administrar habilidades
+      </Link>
 
       <p className="text-sm leading-relaxed text-muted">
         Tocá un nombre para cambiarle el rol o el tope. La carga se cuenta sola a partir de las tareas activas. &quot;Fuera&quot; es una

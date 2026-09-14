@@ -43,7 +43,9 @@ fresh_db() {
 
 echo "==> migraciones: $(ls "$MIGRATIONS" | wc -l) archivos"
 
-for suite in "$HERE"/0[1-9]_*.sql; do
+for suite in "$HERE"/[01][0-9]_*.sql; do
+  # 00_supabase_shim.sql no es una prueba: fresh_db ya lo aplicó.
+  case "$(basename "$suite")" in 00_*) continue ;; esac
   echo
   echo "==> $(basename "$suite")"
   fresh_db

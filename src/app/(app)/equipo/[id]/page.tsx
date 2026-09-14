@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { MiembroForm } from "./miembro-form";
+import { SkillsForm } from "./skills-form";
 import { Banner } from "@/components/banner";
 import { EmptyState } from "@/components/empty-state";
 import { PRIORITY_CLASS, PRIORITY_LABEL, formatDateTime, timeAgo } from "@/lib/format";
-import type { PersonTask, Profile } from "@/lib/types";
+import type { PersonTask, Profile, Skill } from "@/lib/types";
 
 export const metadata = { title: "Persona · Relevo" };
 
@@ -25,8 +26,15 @@ export default async function MiembroPage({ params }: { params: Promise<{ id: st
 
   // El panel de equipo decía cuántas, no cuáles. Para saber qué estaba
   // haciendo alguien había que ir tarea por tarea.
-  const { data: tareas } = await supabase.rpc("person_tasks", { p_person_id: id });
+  const [{ data: tareas }, { data: catalogo }, { data: suyas }] = await Promise.all([
+    supabase.rpc("person_tasks", { p_person_id: id }),
+    supabase.from("skills").select("*").order("name"),
+    supabase.from("profile_skills").select("skill_id").eq("profile_id", id),
+  ]);
+
   const activas: PersonTask[] = tareas ?? [];
+  const skills: Skill[] = catalogo ?? [];
+  const suSeleccion = (suyas ?? []).map((f) => f.skill_id);
 
   return (
     <div className="space-y-6">
@@ -80,6 +88,10 @@ export default async function MiembroPage({ params }: { params: Promise<{ id: st
           </ul>
         )}
       </section>
+
+      <div className="border-t border-line pt-6">
+        <SkillsForm profileId={person.id} skills={skills} selected={suSeleccion} />
+      </div>
 
       <div className="border-t border-line pt-6">
         <MiembroForm person={person} />

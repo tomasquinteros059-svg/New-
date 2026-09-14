@@ -67,6 +67,106 @@
   --shadow-lifted: 0 2px 4px rgb(20 23 27 / 0.06), 0 18px 36px -20px rgb(20 23 27 / 0.35);
 }
 
+/* =============================================================================
+   Modo oscuro
+   =============================================================================
+   Los tokens de @theme se emiten como variables CSS y las utilidades las leen
+   con var(), así que redefinirlas acá abajo cambia toda la aplicación sin
+   tocar una sola clase.
+
+   Tres estados: si la persona eligió, manda `data-theme`; si no eligió, manda
+   el sistema operativo. Por eso el bloque del sistema se descarta cuando hay
+   una elección explícita de luz.
+
+   No es el tema claro con los colores invertidos. En oscuro, un naranja y un
+   rojo que funcionan sobre papel quedan vibrando sobre negro: todos los
+   acentos están levantados en luminosidad y bajados en saturación.
+   ========================================================================== */
+
+/* La elección explícita de la persona gana siempre. */
+:root[data-theme="dark"] {
+  --color-paper: #191612;
+  --color-surface: #221e18;
+  --color-sunken: #2b261f;
+
+  --color-ink: #f3efe7;
+  --color-ink-soft: #c6bfb2;
+  --color-muted: #968d7e;
+
+  --color-line: #353027;
+  --color-line-strong: #4b4438;
+
+  --color-brand-50: #16303f;
+  --color-brand-100: #21435a;
+  --color-brand-300: #a6cee2;
+  --color-brand-500: #5aa6c7;
+  --color-brand-700: #8cc2db;
+  --color-brand-900: #2f7295;
+
+  --color-signal: #e46b3d;
+  --color-signal-dark: #f08558;
+  --color-signal-soft: #3a2318;
+
+  --color-free: #52c39b;
+  --color-free-soft: #133129;
+  --color-busy: #dda05c;
+  --color-busy-soft: #35251a;
+
+  --color-high: #f2867a;
+  --color-high-soft: #3b201e;
+  --color-medium: #e3a862;
+  --color-medium-soft: #372719;
+  --color-low: #a9b5c7;
+  --color-low-soft: #262b34;
+
+  /* Sobre fondo oscuro una sombra no se ve: lo que separa es el borde. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.5);
+}
+
+/* Sin elección explícita, manda el sistema operativo. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --color-paper: #191612;
+  --color-surface: #221e18;
+  --color-sunken: #2b261f;
+
+  --color-ink: #f3efe7;
+  --color-ink-soft: #c6bfb2;
+  --color-muted: #968d7e;
+
+  --color-line: #353027;
+  --color-line-strong: #4b4438;
+
+  --color-brand-50: #16303f;
+  --color-brand-100: #21435a;
+  --color-brand-300: #a6cee2;
+  --color-brand-500: #5aa6c7;
+  --color-brand-700: #8cc2db;
+  --color-brand-900: #2f7295;
+
+  --color-signal: #e46b3d;
+  --color-signal-dark: #f08558;
+  --color-signal-soft: #3a2318;
+
+  --color-free: #52c39b;
+  --color-free-soft: #133129;
+  --color-busy: #dda05c;
+  --color-busy-soft: #35251a;
+
+  --color-high: #f2867a;
+  --color-high-soft: #3b201e;
+  --color-medium: #e3a862;
+  --color-medium-soft: #372719;
+  --color-low: #a9b5c7;
+  --color-low-soft: #262b34;
+
+  /* Sobre fondo oscuro una sombra no se ve: lo que separa es el borde. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.5);
+}
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;

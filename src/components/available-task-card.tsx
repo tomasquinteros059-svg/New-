@@ -17,8 +17,23 @@ type CardTask = Pick<
  * `stale` marca las que pasaron el umbral X. Es la versión NO destructiva de
  * "sube automáticamente de prioridad": la tarea salta al principio de la lista
  * y se marca, pero la prioridad que puso el supervisor no se pisa.
+ *
+ * Las que no podés tomar por habilidades tampoco se esconden. Si se
+ * escondieran, nadie sabría que hay trabajo esperando a alguien con esa
+ * etiqueta, que es justo lo que el supervisor necesita ver.
  */
-export function AvailableTaskCard({ task, stale = false }: { task: CardTask; stale?: boolean }) {
+export function AvailableTaskCard({
+  task,
+  stale = false,
+  requiredSkills = [],
+  meetsSkills = true,
+}: {
+  task: CardTask;
+  stale?: boolean;
+  requiredSkills?: string[];
+  /** Si quien mira cumple las habilidades. Falso NO la esconde: la marca. */
+  meetsSkills?: boolean;
+}) {
   return (
     <Link
       href={`/tarea/${task.id}`}
@@ -33,12 +48,21 @@ export function AvailableTaskCard({ task, stale = false }: { task: CardTask; sta
             {PRIORITY_LABEL[task.priority]}
           </span>
           {stale ? <span className="pill bg-medium-soft text-medium">Estancada</span> : null}
+          {!meetsSkills ? (
+            <span className="pill bg-sunken text-muted">No podés tomarla</span>
+          ) : null}
         </span>
       </div>
 
       {task.description ? (
         <p className="mt-2 line-clamp-2 text-[0.9375rem] leading-relaxed text-ink-soft">
           {task.description}
+        </p>
+      ) : null}
+
+      {requiredSkills.length > 0 ? (
+        <p className="mt-2.5 text-sm text-muted">
+          Pide <span className="font-medium text-ink-soft">{requiredSkills.join(", ")}</span>
         </p>
       ) : null}
 
