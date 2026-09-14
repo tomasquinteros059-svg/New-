@@ -27,17 +27,22 @@ update public.profiles set role = 'supervisor' where id = '$SUP';
 update public.profiles set active_task_limit = 3 where id = '$W1';
 
 insert into public.tasks (title, created_by)
-select 'Tarea ' || g, '$SUP' from generate_series(1, 8) g;
+select 'Tarea ' || lpad(g::text, 2, '0'), '$SUP' from generate_series(1, 20) g;
 SQL
 
 claim_as() { # $1 = uuid del usuario, $2 = uuid de la tarea
   Q -c "set role authenticated; set request.jwt.claim.sub = '$1'; select public.claim_task('$2');"
 }
 
+
+assign_as() { # $1 = supervisor, $2 = tarea, $3 = destinatario
+  Q -c "set role authenticated; set request.jwt.claim.sub = '$1'; select public.assign_task('$2', '$3');"
+}
+
 # =============================================================================
 echo
 echo '--- A: dos personas, la misma tarea, al mismo tiempo ---'
-TASK_A=$(Q -c "select id from public.tasks where title = 'Tarea 1';")
+TASK_A=$(Q -c "select id from public.tasks where title = 'Tarea 01';")
 
 # El primero toma y se queda con la transacción abierta un segundo y medio.
 (
@@ -80,7 +85,7 @@ echo
 echo '--- B: la misma persona pide 6 tareas a la vez, con tope 3 ---'
 # Si el conteo del límite no estuviera protegido por el bloqueo del perfil,
 # las 6 contarían "0 activas" a la vez y entrarían las 6.
-mapfile -t TASKS < <(Q -c "select id from public.tasks where title in ('Tarea 2','Tarea 3','Tarea 4','Tarea 5','Tarea 6','Tarea 7') order by title;")
+mapfile -t TASKS < <(Q -c "select id from public.tasks where title in ('Tarea 02','Tarea 03','Tarea 04','Tarea 05','Tarea 06','Tarea 07') order by title;")
 
 rm -f /tmp/conc_b.*
 i=0
@@ -104,7 +109,7 @@ echo 'OK B: exactamente 3 entran, 3 rebotan, nadie pasa su tope'
 # =============================================================================
 echo
 echo '--- C: seis personas distintas por una sola tarea ---'
-TASK_C=$(Q -c "select id from public.tasks where title = 'Tarea 8';")
+TASK_C=$(Q -c "select id from public.tasks where title = 'Tarea 08';")
 
 Q -q <<SQL
 insert into auth.users (id, email, raw_user_meta_data)
@@ -128,7 +133,82 @@ echo "    ganaron: $WINNERS · perdieron con already_taken: $LOSERS"
 [ "$LOSERS" -eq 5 ]  || fail "solo $LOSERS de 5 perdedores recibieron already_taken"
 echo 'OK C: una sola persona se queda con la tarea, las otras cinco se enteran'
 
+# =============================================================================
+echo
+echo '--- D: tomar contra asignar, la misma tarea ---'
+# La carrera que aparece recién en la Fase 3: el trabajador toca "Tomar" en el
+# mismo momento en que el supervisor se la está asignando a otro.
+TASK_D=$(Q -c "select id from public.tasks where title = 'Tarea 09';")
+
+Q -q <<SQL
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('dddddddd-0000-0000-0000-00000000000d', 'd1@test.local', '{"full_name":"Destinatario"}'),
+  ('cccccccc-0000-0000-0000-00000000000c', 'c1@test.local', '{"full_name":"Apurado"}');
+SQL
+
+# El supervisor asigna y se queda con la transacción abierta un segundo y medio.
+(
+  psql -h "$SOCK" -p "$PORT" -U postgres -d cola -At <<SQL > /tmp/conc_d1.out 2>&1
+set role authenticated;
+set request.jwt.claim.sub = '$SUP';
+begin;
+select public.assign_task('$TASK_D', 'dddddddd-0000-0000-0000-00000000000d');
+select pg_sleep(1.5);
+commit;
+SQL
+) &
+PIDD=$!
+
+sleep 0.4
+claim_as 'cccccccc-0000-0000-0000-00000000000c' "$TASK_D" > /tmp/conc_d2.out 2>&1
+wait $PIDD
+
+echo "    supervisor: $(grep -o '"ok": [a-z]*' /tmp/conc_d1.out | head -1)"
+echo "    trabajador: $(cat /tmp/conc_d2.out)"
+
+grep -q '"ok": true' /tmp/conc_d1.out || fail "la asignación no entró"
+grep -q '"code": "already_taken"' /tmp/conc_d2.out \
+  || fail "el trabajador no recibió already_taken: $(cat /tmp/conc_d2.out)"
+
+OWNER=$(Q -c "select assignee_id from public.tasks where id = '$TASK_D';")
+KIND=$(Q -c "select assignment_kind from public.tasks where id = '$TASK_D';")
+[ "$OWNER" = 'dddddddd-0000-0000-0000-00000000000d' ] || fail "la tarea quedó a nombre de quien perdió"
+[ "$KIND" = 'assigned' ] || fail "quedó marcada como '$KIND' y fue asignada"
+echo 'OK D: la asignación gana, el que tocó "Tomar" se entera, y queda marcada como asignada'
+
+# =============================================================================
+echo
+echo '--- E: cinco tareas, cinco carreras simultáneas de tomar contra asignar ---'
+Q -q <<SQL
+insert into auth.users (id, email, raw_user_meta_data)
+select ('eeee0000-0000-0000-0000-00000000000' || g)::uuid,
+       'e' || g || '@test.local', jsonb_build_object('full_name', 'Toma ' || g)
+from generate_series(1, 5) g;
+insert into auth.users (id, email, raw_user_meta_data)
+select ('ffff0000-0000-0000-0000-00000000000' || g)::uuid,
+       'f' || g || '@test.local', jsonb_build_object('full_name', 'Recibe ' || g)
+from generate_series(1, 5) g;
+SQL
+
+rm -f /tmp/conc_e.*
+for g in 1 2 3 4 5; do
+  T=$(Q -c "select id from public.tasks where title = 'Tarea $((g + 9))';")
+  claim_as  "eeee0000-0000-0000-0000-00000000000$g" "$T" > "/tmp/conc_e.claim.$g" 2>&1 &
+  assign_as "$SUP" "$T" "ffff0000-0000-0000-0000-00000000000$g" > "/tmp/conc_e.assign.$g" 2>&1 &
+done
+wait
+
+WINS=$(cat /tmp/conc_e.* | grep -c '"ok": true')
+ACTIVE=$(Q -c "select count(*) from public.tasks where title in ('Tarea 10','Tarea 11','Tarea 12','Tarea 13','Tarea 14') and status = 'active';")
+DOUBLE=$(Q -c "select count(*) from public.tasks where title in ('Tarea 10','Tarea 11','Tarea 12','Tarea 13','Tarea 14') and status = 'active' and assignee_id is null;")
+
+echo "    diez intentos sobre cinco tareas · ganaron: $WINS · activas: $ACTIVE"
+[ "$WINS" -eq 5 ]   || fail "ganaron $WINS de 10 intentos sobre 5 tareas"
+[ "$ACTIVE" -eq 5 ] || fail "quedaron $ACTIVE tareas activas de 5"
+[ "$DOUBLE" -eq 0 ] || fail "hay tareas activas sin dueño"
+echo 'OK E: una sola operación gana por tarea, sin importar de qué lado venga'
+
 echo
 echo '========================================'
-echo '  Concurrencia real: A, B y C PASARON'
+echo '  Concurrencia real: A, B, C, D y E PASARON'
 echo '========================================'

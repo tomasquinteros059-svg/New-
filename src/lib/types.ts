@@ -87,6 +87,34 @@ export type TaskActionResult = {
   task_id?: string;
 };
 
+/** Una fila de la foto del equipo. Ver team_load() en la migración 0005. */
+export type TeamMember = {
+  id: string;
+  full_name: string;
+  role: AppRole;
+  is_present: boolean;
+  active_task_limit: number;
+  /** Derivado de contar tareas activas. Puede superar el tope si se asignó. */
+  active_count: number;
+  oldest_active_at: string | null;
+};
+
+export type AssignResult =
+  | {
+      ok: true;
+      code: "assigned";
+      over_limit: boolean;
+      not_present: boolean;
+      active: number;
+      limit: number;
+      assignee_name: string;
+    }
+  | {
+      ok: false;
+      code: "no_session" | "not_supervisor" | "no_assignee" | "not_found" | "not_available";
+      status?: TaskStatus;
+    };
+
 export type AppSettings = {
   id: boolean;
   stale_available_hours: number;
@@ -134,6 +162,11 @@ export type Database = {
       is_supervisor: { Args: Record<string, never>; Returns: boolean };
       claim_task: { Args: { p_task_id: string }; Returns: TaskActionResult };
       close_task: { Args: { p_task_id: string; p_note: string }; Returns: TaskActionResult };
+      assign_task: {
+        Args: { p_task_id: string; p_assignee_id: string };
+        Returns: AssignResult;
+      };
+      team_load: { Args: Record<string, never>; Returns: TeamMember[] };
     };
     Enums: {
       app_role: AppRole;

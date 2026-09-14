@@ -152,3 +152,53 @@ export async function createTask(_prev: ActionState, formData: FormData): Promis
   revalidatePath("/disponibles");
   redirect("/disponibles?aviso=creada");
 }
+
+/* -------------------------------------------------------------------------- */
+/* Asignar (supervisor)                                                        */
+/* -------------------------------------------------------------------------- */
+
+export async function assignTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSupervisor();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const assigneeId = String(formData.get("assignee_id") ?? "");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("assign_task", {
+    p_task_id: taskId,
+    p_assignee_id: assigneeId,
+  });
+
+  if (error || !data) {
+    return { status: "error", message: "No pudimos asignar la tarea. Probá de nuevo." };
+  }
+
+  if (data.ok) {
+    revalidatePath("/disponibles");
+    revalidatePath("/equipo");
+    revalidatePath(`/tarea/${taskId}`);
+
+    // Los avisos viajan como banderas, no como texto: el nombre de la persona
+    // ya lo tiene la pantalla de destino.
+    const flags = new URLSearchParams({ aviso: "asignada" });
+    if (data.over_limit) flags.set("tope", "1");
+    if (data.not_present) flags.set("turno", "1");
+    redirect(`/tarea/${taskId}?${flags.toString()}`);
+  }
+
+  switch (data.code) {
+    // Alguien la tomó mientras el supervisor elegía a quién dársela.
+    case "not_available":
+      revalidatePath(`/tarea/${taskId}`);
+      redirect(`/tarea/${taskId}?aviso=ya-no-disponible`);
+
+    case "not_found":
+      redirect("/disponibles?aviso=no-existe");
+
+    case "no_assignee":
+      return { status: "error", message: "Esa persona ya no tiene cuenta." };
+
+    default:
+      return { status: "error", message: "No pudimos asignar la tarea. Probá de nuevo." };
+  }
+}

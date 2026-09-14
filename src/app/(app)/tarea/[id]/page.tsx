@@ -9,9 +9,16 @@ import type { Profile, Task } from "@/lib/types";
 
 export const metadata = { title: "Tarea · Relevo" };
 
-export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
-  // Next.js 16: params es una promesa.
+export default async function TaskPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ aviso?: string; tope?: string; turno?: string }>;
+}) {
+  // Next.js 16: params y searchParams son promesas.
   const { id } = await params;
+  const { aviso, tope, turno } = await searchParams;
   const { userId, profile } = await requireSession();
   const supabase = await createClient();
 
@@ -56,6 +63,20 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
+      {aviso === "asignada" ? (
+        <Banner tone={tope || turno ? "warn" : "good"}>
+          Asignada a {assignee?.full_name ?? "esa persona"}.
+          {tope ? " Quedó por encima de su tope." : ""}
+          {turno ? " Está fuera de turno, así que puede que no la vea hoy." : ""}
+        </Banner>
+      ) : null}
+
+      {aviso === "ya-no-disponible" ? (
+        <Banner tone="warn">
+          Mientras elegías a quién dársela, alguien la tomó.
+        </Banner>
+      ) : null}
+
       <TaskHeading task={task} />
 
       <TaskFacts task={task} isMine={isMine} assigneeName={assignee?.full_name} />
@@ -70,7 +91,16 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </section>
       ) : null}
 
-      {task.status === "available" ? <ClaimForm taskId={task.id} /> : null}
+      {task.status === "available" ? (
+        <div className="space-y-3">
+          <ClaimForm taskId={task.id} />
+          {isSupervisor ? (
+            <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet w-full">
+              Asignar a alguien
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {task.status === "active" && (isMine || isSupervisor) ? (
         <section className="space-y-4">

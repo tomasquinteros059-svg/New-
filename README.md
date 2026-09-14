@@ -8,13 +8,13 @@ No es un ERP, no es un chat, no es un gestor de proyectos.
 
 ---
 
-## Estado: Fases 1 y 2 completas
+## Estado: Fases 1, 2 y 3 completas
 
 | Fase | Contenido | Estado |
 |---|---|---|
 | **1 — Base** | Proyecto, base de datos con RLS, autenticación, entrar y salir | ✅ |
 | **2 — Cola** | Crear, listar por prioridad, tomar, cerrar | ✅ |
-| 3 — Capacidad | Panel de carga del equipo, asignación directa | pendiente |
+| **3 — Capacidad** | Panel de carga del equipo, asignación directa | ✅ |
 | 4 — Control | Soltar con motivo, evidencia, avisos de rescate | pendiente |
 
 **Criterio de la Fase 1**: dos usuarios distintos pueden iniciar sesión y cada
@@ -24,10 +24,13 @@ uno ve solo lo suyo. → pruebas 20 a 24 de `01_rls_tests.sql`.
 tomar la misma tarea, y el segundo recibe un mensaje claro. → prueba A de
 `03_concurrency.sh`, con procesos y transacciones de verdad.
 
-En total, `npm run test:db` corre **58 afirmaciones más 3 pruebas de
-concurrencia real**. El límite de tareas activas también está probado bajo
-concurrencia: seis pedidos simultáneos de la misma persona con tope 3 dejan
-exactamente 3.
+**Criterio de la Fase 3**: el supervisor ve de un vistazo quién está saturado y
+quién libre. → los tres números del resumen en `/equipo`, sobre `team_load()`.
+
+En total, `npm run test:db` corre **89 afirmaciones más 5 pruebas de
+concurrencia real**. El límite de tareas activas está probado bajo concurrencia
+(seis pedidos simultáneos de la misma persona con tope 3 dejan exactamente 3), y
+también la carrera entre tomar y asignar sobre la misma tarea.
 
 ---
 
@@ -121,7 +124,8 @@ y corre cada juego de pruebas contra una base recién creada:
 |---|---|
 | `01_rls_tests.sql` | 31 afirmaciones sobre las políticas de seguridad |
 | `02_rpc_tests.sql` | 27 afirmaciones sobre tomar y cerrar |
-| `03_concurrency.sh` | Carreras reales: procesos y transacciones simultáneas |
+| `04_assign_tests.sql` | 31 afirmaciones sobre asignar y la carga del equipo |
+| `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
 
 No toca tu proyecto de Supabase y no necesita Docker. Requiere `postgresql-16`.
 
@@ -147,6 +151,7 @@ src/
     (app)/mis-tareas/      Cola propia y capacidad
     (app)/disponibles/     La cola, ordenada por prioridad
     (app)/tarea/[id]/      Detalle, con tomar y cerrar
+    (app)/tarea/[id]/asignar/  Elegir a quién dársela (solo supervisor)
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
@@ -212,6 +217,24 @@ los seis, pasan el límite los seis, y la dejan con seis tareas. El orden de
 bloqueo es siempre perfil y después tarea, para que dos transacciones no se
 traben en espejo.
 
+**El tope es duro para tomar y blando para asignar.** `claim_task` rebota con
+`at_limit`; `assign_task` entra igual y devuelve `over_limit` con los números.
+Tomar es una decisión de la persona y el sistema puede frenarla; asignar es una
+orden, y el sistema no le discute una orden al supervisor: le muestra el costo
+antes y se lo confirma después. La misma asimetría vale para la presencia: se
+puede asignar a alguien fuera de turno, y la app lo dice.
+
+**La carga del equipo se cuenta, no se guarda.** `team_load()` deriva el número
+de tareas activas de cada persona con un `left join` agregado. No hay contador
+en `profiles`: sería una segunda fuente de verdad. El índice parcial
+`tasks_active_by_assignee_idx` hace que contar salga gratis con decenas de
+personas.
+
+**La barra de carga sabe dibujar más tareas que el tope.** Como asignar puede
+pasarse, alguien con tope 3 puede tener 4. Los segmentos por encima del tope van
+en rojo. Si la barra se recortara al tope, el panel escondería justo el caso que
+hay que mirar.
+
 **Llegar segundo no es un error.** `claim_task` devuelve `{ ok, code }` en vez
 de tirar excepción: `already_taken`, `at_limit` y `not_found` son resultados
 esperados y cada uno tiene su mensaje. `at_limit` se queda en la pantalla
@@ -255,18 +278,18 @@ explícita. Cuando entre, necesita su propio juego de políticas sobre
 
 ---
 
-## Lo que sigue (Fase 3)
+## Lo que sigue (Fase 4)
 
-1. Panel de carga del equipo: cuántas activas lleva cada uno contra su tope, y
-   quién está en turno.
-2. Asignación directa del supervisor a una persona (`assign_task`), con el
-   límite blando: avisa si se pasa, pero deja.
-3. La tarea asignada se muestra distinta de la tomada; el dato ya se guarda
-   (`assignment_kind`).
+1. `release_task`: soltar con motivo obligatorio. La tarea vuelve a la cola y
+   `available_since` se reinicia; el churn queda en el historial.
+2. Pantalla de historial de soltadas para el supervisor.
+3. Evidencia al cerrar: Supabase Storage con sus propias políticas sobre
+   `storage.objects`, rutas por tarea y URLs firmadas.
+4. Rescate de tareas olvidadas. Los umbrales ya están en `app_settings`; falta
+   decidir el mecanismo (ver más abajo).
 
-Criterio para darla por cerrada: el supervisor ve de un vistazo quién está
-saturado y quién libre.
+Criterio para darla por cerrada: una tarea abandonada genera aviso sola, sin que
+nadie la toque.
 
-**Todavía no se puede soltar una tarea.** Está en la Fase 4 junto con el motivo
-obligatorio y el historial de soltadas. Hasta entonces, una tarea tomada se
-cierra o la cierra el supervisor.
+**Todavía no se puede soltar una tarea.** Hasta que llegue la Fase 4, una tarea
+tomada se cierra, o la cierra el supervisor.
