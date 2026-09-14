@@ -8,7 +8,7 @@ import { EvidenceList } from "@/components/evidence-list";
 import { Banner } from "@/components/banner";
 import { TaskFacts, TaskHeading } from "@/components/task-facts";
 import { formatDateTime } from "@/lib/format";
-import type { Profile, Task } from "@/lib/types";
+import type { Profile, Task, TaskEvent } from "@/lib/types";
 
 export const metadata = { title: "Tarea · Relevo" };
 
@@ -54,6 +54,24 @@ export default async function TaskPage({
   const isMine = task.assignee_id === userId;
   const isSupervisor = profile.role === "supervisor";
 
+  /*
+   * Si está cancelada, el motivo es lo único que le explica a quien la tenía
+   * por qué le desapareció de la lista. Vive en el historial, y RLS deja que
+   * lo vea porque figura como subject del evento.
+   */
+  let motivoCancelacion: string | null = null;
+  if (task.status === "cancelled") {
+    const { data } = await supabase
+      .from("task_events")
+      .select("*")
+      .eq("task_id", task.id)
+      .eq("type", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<TaskEvent>();
+    motivoCancelacion = data?.note ?? null;
+  }
+
   let assignee: Profile | null = null;
   if (task.assignee_id && !isMine) {
     const { data } = await supabase
@@ -80,6 +98,21 @@ export default async function TaskPage({
         </Banner>
       ) : null}
 
+      {aviso === "editada" ? <Banner tone="good">Cambios guardados.</Banner> : null}
+      {aviso === "sin-cambios" ? (
+        <Banner tone="info">No cambiaste nada, así que no se guardó nada.</Banner>
+      ) : null}
+      {aviso === "cancelada" ? (
+        <Banner tone="warn">Tarea cancelada. Queda como registro, con tu motivo.</Banner>
+      ) : null}
+
+      {task.status === "cancelled" ? (
+        <Banner tone="warn">
+          Esta tarea fue cancelada
+          {motivoCancelacion ? `: ${motivoCancelacion}` : "."}
+        </Banner>
+      ) : null}
+
       <TaskHeading task={task} />
 
       <TaskFacts task={task} isMine={isMine} assigneeName={assignee?.full_name} />
@@ -103,6 +136,12 @@ export default async function TaskPage({
             </Link>
           ) : null}
         </div>
+      ) : null}
+
+      {isSupervisor && (task.status === "available" || task.status === "active") ? (
+        <Link href={`/tarea/${task.id}/editar`} className="btn-quiet w-full">
+          Editar o cancelar
+        </Link>
       ) : null}
 
       {task.status === "active" && (isMine || isSupervisor) ? (

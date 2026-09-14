@@ -31,7 +31,7 @@ quién libre. → los tres números del resumen en `/equipo`, sobre `team_load()
 la toque. → pruebas 32 a 37 de `05_phase4_tests.sql`, donde se envejece una
 tarea sin que nadie interactúe y el barrido crea el aviso.
 
-En total, `npm run test:db` corre **212 afirmaciones más 5 pruebas de
+En total, `npm run test:db` corre **249 afirmaciones más 5 pruebas de
 concurrencia real**, incluido un escenario de punta a punta que recorre un día
 completo de operación. El límite de tareas activas está probado bajo concurrencia
 (seis pedidos simultáneos de la misma persona con tope 3 dejan exactamente 3), y
@@ -101,6 +101,10 @@ usar el mismo `update` desde el SQL Editor: **todavía no hay pantalla para
 eso**. Las reglas ya están (un supervisor puede hacerlo, un trabajador no, y no
 podés quedarte sin ningún supervisor); lo que falta es la interfaz.
 
+> Una vez adentro, el resto se maneja desde la aplicación: el rol y el tope de
+> cada persona se cambian tocando su nombre en **Equipo**, y los umbrales X e Y
+> en **Control → Cambiar los umbrales**.
+
 ### 5. Programar el barrido de rescate
 
 En el SQL Editor, pegá y ejecutá `supabase/scheduled/pg_cron.sql`. Programa el
@@ -152,7 +156,8 @@ y corre cada juego de pruebas contra una base recién creada:
 | `04_assign_tests.sql` | 31 afirmaciones sobre asignar y la carga del equipo |
 | `05_phase4_tests.sql` | 66 afirmaciones sobre soltar, evidencia, Storage y rescate |
 | `06_qa_regression.sql` | 14 afirmaciones sobre los defectos encontrados en el QA |
-| `07_e2e_scenario.sql` | Un día completo de operación, 43 pasos verificados |
+| `07_e2e_scenario.sql` | Un día completo de operación, 48 pasos verificados |
+| `08_edit_cancel_tests.sql` | 32 afirmaciones sobre editar, cancelar y la publicación |
 | `03_concurrency.sh` | Cinco carreras reales: procesos y transacciones simultáneas |
 
 `07_e2e_scenario.sql` narra lo que va pasando mientras verifica. Correrlo es la
@@ -184,6 +189,9 @@ src/
     (app)/tarea/[id]/      Detalle, con tomar y cerrar
     (app)/tarea/[id]/asignar/  Elegir a quién dársela (solo supervisor)
     (app)/control/         Rescate y soltadas (solo supervisor)
+    (app)/ajustes/         Umbrales X e Y (solo supervisor)
+    (app)/equipo/[id]/     Rol y tope de una persona (solo supervisor)
+    (app)/tarea/[id]/editar/   Editar y cancelar (solo supervisor)
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
@@ -249,6 +257,24 @@ ese bloqueo, seis pedidos simultáneos de la misma persona cuentan "0 activas"
 los seis, pasan el límite los seis, y la dejan con seis tareas. El orden de
 bloqueo es siempre perfil y después tarea, para que dos transacciones no se
 traben en espejo.
+
+**Nadie edita `tasks` con un UPDATE directo, ni siquiera el supervisor.** El
+privilegio está revocado para el rol `authenticated` entero. Todo cambio pasa
+por una función que escribe su evento, así que el historial no tiene agujeros.
+Antes había una política amplia de supervisor que la aplicación no usaba y que
+permitía cambiar una tarea por la API sin dejar rastro.
+
+**El tiempo real no trae datos, solo avisa.** El cliente escucha los cambios de
+`tasks` y le pide a Next que vuelva a renderizar en el servidor. La pantalla
+sigue saliendo de una sola consulta con RLS aplicada, y no hay dos caminos por
+los que pueda llegar un dato distinto. Los eventos se agrupan con un retardo
+corto: si el supervisor carga seis tareas seguidas, es un refresco y no seis. Si
+el tiempo real no está disponible, la aplicación funciona como antes.
+
+**El motivo por el que una tarea dejó de estar disponible viaja en la
+respuesta.** `claim_task` devuelve `already_taken` tanto si alguien la tomó como
+si el supervisor la canceló, pero incluye el estado. Sin usarlo, la app le
+diría «la tomó otra persona» a quien toca Tomar en una tarea cancelada.
 
 **El aviso de rescate tiene que existir aunque nadie mire.** Por eso hay una
 tabla `alerts` y un barrido que la llena, en vez de calcular los avisos cuando
@@ -402,22 +428,18 @@ cola única funciona, y las etiquetas se agregan después sin romper nada.
 **No hay modo oscuro.** La paleta está definida para luz alta, que es la
 condición de uso esperada.
 
-**No hay tiempo real.** Era parte de la justificación original de elegir
-Supabase, y quedó sin hacer. La cola no se actualiza sola: si alguien toma una
-tarea mientras vos mirás la lista, la seguís viendo hasta que navegues o
-recargues. Lo que evita que eso sea un problema serio es que el bloqueo está en
-la base de datos: al tocar "Tomar" recibís `already_taken` y la lista se
-actualiza. O sea, la consecuencia está manejada, pero la lista miente entre
-recarga y recarga.
+**El tiempo real está escrito pero no probado contra Supabase.** El cliente se
+suscribe a los cambios de `tasks` y la tabla está en la publicación
+`supabase_realtime` (verificado). Lo que no se pudo verificar sin un proyecto
+real es la conexión en sí. Si falla, la aplicación funciona como antes: la lista
+queda vieja hasta recargar, y al tocar "Tomar" llega `already_taken`.
 
-**No hay pantalla para cambiar el rol ni el tope de una persona.** Las reglas
-están en la base y las pruebas las cubren; falta la interfaz. Hoy se hace con
-un `update` en el SQL Editor.
+**No se puede reasignar una tarea activa de una persona a otra en un paso.** Hay
+que soltarla y volver a asignarla. Son dos acciones y las dos quedan en el
+historial, que discutiblemente es mejor que una sola.
 
-**No hay pantalla para cambiar X e Y.** `app_settings` es editable por un
-supervisor según RLS, y está probado, pero no hay dónde tocarlo salvo el SQL
-Editor.
+**El panel de equipo no muestra QUÉ tiene cada persona**, solo cuántas. Para ver
+el detalle hay que ir tarea por tarea.
 
-**No se pueden editar tareas ya creadas.** RLS lo permite para el supervisor y
-el tipo de evento `edited` existe en el modelo, pero nadie lo escribe y no hay
-formulario.
+**No hay búsqueda ni paginación en la cola.** Con treinta tareas la pantalla se
+hace larga.

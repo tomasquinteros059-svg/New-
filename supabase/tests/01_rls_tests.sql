@@ -96,17 +96,19 @@ begin
 end $$;
 \echo 'OK 9: crear tareas es solo del supervisor'
 
-\echo '--- el trabajador NO puede editar tareas directamente ---'
+\echo '--- NADIE edita tareas por UPDATE directo ---'
 do $$
-declare n int;
 begin
-  update public.tasks set priority = 'high' where title = 'Inventario galpón';
-  get diagnostics n = row_count;
-  if n <> 0 then
-    raise exception 'FALLO 10: un trabajador pudo editar una tarea (% filas)', n;
-  end if;
+  -- Ya no es cuestión de políticas: se revocó el privilegio de UPDATE sobre
+  -- `tasks` para el rol `authenticated` entero, supervisor incluido. Todo
+  -- cambio pasa por una función que escribe su evento en el historial.
+  begin
+    update public.tasks set priority = 'high' where title = 'Inventario galpón';
+    raise exception 'FALLO 10: se pudo editar una tarea con un UPDATE directo';
+  exception when insufficient_privilege then null;
+  end;
 end $$;
-\echo 'OK 10: sin política de UPDATE para el trabajador (las transiciones van por RPC en Fase 2)'
+\echo 'OK 10: el UPDATE directo está revocado; todo pasa por RPC y queda en el historial'
 
 -- =============================================================================
 \echo '--- escalada de privilegios ---'

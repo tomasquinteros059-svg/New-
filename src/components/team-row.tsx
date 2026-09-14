@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LoadBar } from "@/components/load-bar";
 import { timeAgo } from "@/lib/format";
 import type { TeamMember } from "@/lib/types";
@@ -21,10 +22,13 @@ const PILL = {
 export function TeamRow({
   person,
   action,
+  href,
 }: {
   person: TeamMember;
-  /** Botón opcional a la derecha del nombre (usado al asignar). */
+  /** Botón opcional debajo de la carga (usado al asignar). */
   action?: React.ReactNode;
+  /** Si viene, el nombre lleva a esa pantalla. */
+  href?: string;
 }) {
   const state = loadState(person);
   const pill = PILL[state];
@@ -33,9 +37,18 @@ export function TeamRow({
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate font-display text-[1.0625rem] font-semibold text-ink">
-            {person.full_name}
-          </p>
+          {href ? (
+            <Link
+              href={href}
+              className="block truncate font-display text-[1.0625rem] font-semibold text-ink underline-offset-4 hover:underline"
+            >
+              {person.full_name}
+            </Link>
+          ) : (
+            <p className="truncate font-display text-[1.0625rem] font-semibold text-ink">
+              {person.full_name}
+            </p>
+          )}
           <p className="mt-0.5 text-sm text-muted">
             {person.active_count} de {person.active_task_limit}
             {person.role === "supervisor" ? " · supervisor" : ""}

@@ -277,6 +277,21 @@ export type Database = {
       safe_uuid: { Args: { p: string }; Returns: string | null };
       available_queue: { Args: Record<string, never>; Returns: QueueItem[] };
       ensure_profile: { Args: Record<string, never>; Returns: boolean };
+      edit_task: {
+        Args: {
+          p_task_id: string;
+          p_title: string;
+          p_description: string | null;
+          p_priority: TaskPriority;
+          p_due_at: string | null;
+          p_requires_evidence: boolean;
+        };
+        Returns: SimpleResult & { changes?: string };
+      };
+      cancel_task: {
+        Args: { p_task_id: string; p_reason: string };
+        Returns: SimpleResult & { was_active?: boolean };
+      };
     };
     Enums: {
       app_role: AppRole;

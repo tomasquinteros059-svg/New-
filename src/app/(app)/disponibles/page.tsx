@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AvailableTaskCard } from "@/components/available-task-card";
 import { EmptyState } from "@/components/empty-state";
 import { Banner } from "@/components/banner";
+import { RealtimeTasks } from "@/components/realtime-tasks";
 import type { QueueItem } from "@/lib/types";
 
 export const metadata = { title: "Disponibles · Relevo" };
@@ -16,6 +17,10 @@ const AVISOS = {
   "no-existe": {
     tone: "warn" as const,
     text: "Esa tarea ya no está en la cola.",
+  },
+  cancelada: {
+    tone: "warn" as const,
+    text: "Esa tarea fue cancelada por el supervisor. Acá está el resto.",
   },
   creada: { tone: "good" as const, text: "Tarea creada. Ya está en la cola." },
 };
@@ -43,6 +48,8 @@ export default async function DisponiblesPage({
 
   return (
     <div className="space-y-6">
+      <RealtimeTasks topic="cola-disponibles" />
+
       <header>
         <h1 className="font-display text-2xl font-bold text-ink">Disponibles</h1>
         <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">

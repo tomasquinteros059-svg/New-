@@ -34,9 +34,17 @@ export async function claimTask(_prev: ActionState, formData: FormData): Promise
   switch (data.code) {
     // Llegaste segundo. No es un error tuyo, así que se cuenta como tal: te
     // devolvemos a la lista, ya sin esa tarea, con el aviso puesto.
+    //
+    // `already_taken` cubre todo lo que dejó de estar disponible, y eso incluye
+    // que el supervisor la haya cancelado. Decirle "la tomó otra persona" sería
+    // mentirle: el motivo verdadero viene en `status`.
     case "already_taken":
       revalidatePath("/disponibles");
-      redirect("/disponibles?aviso=ya-tomada");
+      redirect(
+        data.status === "cancelled"
+          ? "/disponibles?aviso=cancelada"
+          : "/disponibles?aviso=ya-tomada",
+      );
 
     case "not_found":
       revalidatePath("/disponibles");
@@ -194,10 +202,16 @@ export async function assignTask(_prev: ActionState, formData: FormData): Promis
   }
 
   switch (data.code) {
-    // Alguien la tomó mientras el supervisor elegía a quién dársela.
+    // Dejó de estar disponible mientras el supervisor elegía a quién dársela.
+    // Puede ser que alguien la haya tomado, o que otro supervisor la haya
+    // cancelado; son dos cosas distintas y se dicen distinto.
     case "not_available":
       revalidatePath(`/tarea/${taskId}`);
-      redirect(`/tarea/${taskId}?aviso=ya-no-disponible`);
+      redirect(
+        data.status === "cancelled"
+          ? `/tarea/${taskId}`
+          : `/tarea/${taskId}?aviso=ya-no-disponible`,
+      );
 
     case "not_found":
       redirect("/disponibles?aviso=no-existe");
@@ -302,4 +316,101 @@ export async function sweepNow(): Promise<void> {
   revalidatePath("/control");
   revalidatePath("/", "layout");
   redirect("/control?aviso=revisado");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Editar y cancelar (supervisor)                                              */
+/* -------------------------------------------------------------------------- */
+
+export async function editTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSupervisor();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const priorityRaw = String(formData.get("priority") ?? "medium");
+  const dueLocal = String(formData.get("due_at") ?? "").trim();
+  const requiresEvidence = formData.get("requires_evidence") === "on";
+
+  if (title.length < 3 || title.length > 140) {
+    return { status: "error", message: "El título tiene que tener entre 3 y 140 caracteres." };
+  }
+
+  const priority: TaskPriority = PRIORITIES.includes(priorityRaw as TaskPriority)
+    ? (priorityRaw as TaskPriority)
+    : "medium";
+
+  const dueAt = wallTimeToUtcIso(dueLocal, TIME_ZONE);
+  if (dueLocal && !dueAt) {
+    return { status: "error", message: "Esa fecha límite no se entiende." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("edit_task", {
+    p_task_id: taskId,
+    p_title: title,
+    p_description: description || null,
+    p_priority: priority,
+    p_due_at: dueAt,
+    p_requires_evidence: requiresEvidence,
+  });
+
+  if (error || !data) {
+    return { status: "error", message: "No pudimos guardar la tarea. Probá de nuevo." };
+  }
+
+  if (data.ok) {
+    revalidatePath("/disponibles");
+    revalidatePath(`/tarea/${taskId}`);
+    redirect(`/tarea/${taskId}?aviso=${data.code === "unchanged" ? "sin-cambios" : "editada"}`);
+  }
+
+  switch (data.code) {
+    case "bad_title":
+      return { status: "error", message: "El título tiene que tener entre 3 y 140 caracteres." };
+    case "not_editable":
+      return {
+        status: "error",
+        message: "Una tarea cerrada o cancelada ya es registro: no se edita.",
+      };
+    default:
+      return { status: "error", message: "No pudimos guardar la tarea. Probá de nuevo." };
+  }
+}
+
+export async function cancelTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireSupervisor();
+
+  const taskId = String(formData.get("task_id") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+
+  if (reason.length < 3) {
+    return { status: "error", message: "Escribí por qué la cancelás, aunque sea una línea." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("cancel_task", {
+    p_task_id: taskId,
+    p_reason: reason,
+  });
+
+  if (error || !data) {
+    return { status: "error", message: "No pudimos cancelar la tarea. Probá de nuevo." };
+  }
+
+  if (data.ok) {
+    revalidatePath("/disponibles");
+    revalidatePath("/equipo");
+    revalidatePath(`/tarea/${taskId}`);
+    redirect(`/tarea/${taskId}?aviso=cancelada`);
+  }
+
+  switch (data.code) {
+    case "reason_required":
+      return { status: "error", message: "Escribí por qué la cancelás, aunque sea una línea." };
+    case "not_cancellable":
+      return { status: "error", message: "Esta tarea ya está cerrada o cancelada." };
+    default:
+      return { status: "error", message: "No pudimos cancelar la tarea. Probá de nuevo." };
+  }
 }

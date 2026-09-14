@@ -8,10 +8,15 @@ import type { TeamMember } from "@/lib/types";
 
 export const metadata = { title: "Equipo · Relevo" };
 
-export default async function EquipoPage() {
+export default async function EquipoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ aviso?: string }>;
+}) {
   // La puerta real está en team_load(), que le devuelve cero filas a quien no
   // es supervisor. Esto solo evita mostrar una pantalla que vendría vacía.
   await requireSupervisor();
+  const { aviso } = await searchParams;
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("team_load");
@@ -26,6 +31,8 @@ export default async function EquipoPage() {
         </p>
       </header>
 
+      {aviso === "guardado" ? <Banner tone="good">Cambios guardados.</Banner> : null}
+
       <TeamSummary team={team} />
 
       {error ? (
@@ -38,14 +45,14 @@ export default async function EquipoPage() {
         <ul className="space-y-3">
           {team.map((person) => (
             <li key={person.id}>
-              <TeamRow person={person} />
+              <TeamRow person={person} href={`/equipo/${person.id}`} />
             </li>
           ))}
         </ul>
       )}
 
       <p className="text-sm leading-relaxed text-muted">
-        La carga se cuenta sola a partir de las tareas activas. &quot;Fuera&quot; es una
+        Tocá un nombre para cambiarle el rol o el tope. La carga se cuenta sola a partir de las tareas activas. &quot;Fuera&quot; es una
         declaración de la persona, no una deducción: alguien puede estar fuera de turno
         y tener trabajo abierto, y eso es justamente lo que conviene ver.
       </p>

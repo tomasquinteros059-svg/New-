@@ -278,6 +278,41 @@ end $$;
 
 -- =============================================================================
 \echo ''
+\echo '15:00  Ana se da cuenta de que una tarea estaba mal cargada'
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+do $$
+declare r jsonb;
+begin
+  r := public.edit_task('bbbb0000-0000-0000-0000-00000000000b',
+                        'Cambiar filtros de la línea B', 'Son los de 10 pulgadas.',
+                        'high', null, false);
+  if (r ->> 'ok')::boolean is not true then raise exception 'E2E 44: no pudo corregir (%)', r; end if;
+  if (r ->> 'changes') not like '%prioridad: medium → high%' then
+    raise exception 'E2E 45: el historial no dice qué cambió (%)', r ->> 'changes';
+  end if;
+end $$;
+\echo '       corrige título, detalle y prioridad; el historial guarda el antes y el después'
+
+\echo '15:10  y otra ya no hace falta'
+insert into public.tasks (id, title, priority, created_by)
+values ('eeee0000-0000-0000-0000-00000000000e', 'Pintar la reja', 'low',
+        '11111111-1111-1111-1111-111111111111');
+do $$
+declare r jsonb;
+begin
+  r := public.cancel_task('eeee0000-0000-0000-0000-00000000000e',
+                          'Se resolvió con el proveedor.');
+  if (r ->> 'ok')::boolean is not true then raise exception 'E2E 46: no pudo cancelar (%)', r; end if;
+  if exists (select 1 from public.available_queue()
+             where id = 'eeee0000-0000-0000-0000-00000000000e') then
+    raise exception 'E2E 47: la cancelada sigue en la cola';
+  end if;
+end $$;
+\echo '       sale de la cola y queda como registro, con motivo'
+
+-- =============================================================================
+\echo ''
 \echo '16:00  Beto termina la que pedía evidencia'
 set role authenticated;
 set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
@@ -314,13 +349,18 @@ begin
   select count(*) into v_avisos   from public.alerts;
 
   if v_cerradas <> 2 then raise exception 'E2E 39: cerradas = %, esperaba 2', v_cerradas; end if;
+  if (select count(*) from public.tasks where status = 'cancelled') <> 1 then
+    raise exception 'E2E 39b: canceladas = %, esperaba 1',
+      (select count(*) from public.tasks where status = 'cancelled');
+  end if;
   if v_activas  <> 1 then raise exception 'E2E 40: activas = %, esperaba 1', v_activas; end if;
   if v_cola     <> 0 then raise exception 'E2E 41: en cola = %, esperaba 0', v_cola; end if;
   if v_avisos   <> 0 then raise exception 'E2E 42: avisos abiertos = %, esperaba 0', v_avisos; end if;
 
-  -- 3 creadas + 3 tomadas + 1 asignada + 2 cerradas + 1 soltada = 10
-  if v_eventos <> 10 then
-    raise exception 'E2E 43: el historial tiene % eventos y esperaba 10', v_eventos;
+  -- 4 creadas + 3 tomadas + 1 asignada + 2 cerradas + 1 soltada + 1 editada
+  -- + 1 cancelada = 13
+  if v_eventos <> 13 then
+    raise exception 'E2E 43: el historial tiene % eventos y esperaba 13', v_eventos;
   end if;
 
   raise notice 'cerradas: %  ·  activas: %  ·  en cola: %  ·  eventos: %  ·  avisos: %',
@@ -330,5 +370,5 @@ reset role;
 
 \echo ''
 \echo '========================================'
-\echo '  Escenario de punta a punta: 43 pasos verificados'
+\echo '  Escenario de punta a punta: 48 pasos verificados'
 \echo '========================================'

@@ -1,4 +1,5 @@
 import { requireSupervisor } from "@/lib/auth/dal";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { sweepNow } from "@/lib/tasks/actions";
 import { AlertCard } from "@/components/alert-card";
@@ -77,6 +78,10 @@ export default async function ControlPage({
             Revisar ahora
           </button>
         </form>
+
+        <Link href="/ajustes" className="btn-quiet w-full">
+          Cambiar los umbrales
+        </Link>
       </section>
 
       <section className="space-y-4 border-t border-line pt-8">

@@ -4,6 +4,7 @@ import { TaskCard } from "@/components/task-card";
 import { EmptyState } from "@/components/empty-state";
 import { CapacityMeter } from "@/components/capacity-meter";
 import { Banner } from "@/components/banner";
+import { RealtimeTasks } from "@/components/realtime-tasks";
 import type { Task } from "@/lib/types";
 
 export const metadata = { title: "Mis tareas · Relevo" };
@@ -34,6 +35,8 @@ export default async function MisTareasPage({
 
   return (
     <div className="space-y-6">
+      <RealtimeTasks topic="mis-tareas" />
+
       <header>
         <h1 className="font-display text-2xl font-bold text-ink">Mis tareas</h1>
         <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">
