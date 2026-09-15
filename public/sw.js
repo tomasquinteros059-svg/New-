@@ -26,6 +26,8 @@ self.addEventListener("push", (event) => {
   const titulo = datos.title || "Relevo";
   const opciones = {
     body: datos.body || "",
+    icon: "/icono-192.png",
+    badge: "/icono-192.png",
     // `tag` agrupa: dos avisos de la misma tarea se reemplazan en vez de
     // apilarse en la barra de notificaciones.
     tag: datos.tag || "relevo",

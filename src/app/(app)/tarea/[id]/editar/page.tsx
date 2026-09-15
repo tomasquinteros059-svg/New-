@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { EditarForm, CancelarForm } from "./editar-form";
+import { PageHeader } from "@/components/page-header";
 import { utcIsoToWallTime } from "@/lib/tz";
 import { TIME_ZONE } from "@/lib/format";
 import type { Skill, Task } from "@/lib/types";
@@ -40,15 +40,14 @@ export default async function EditarTareaPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="label">Editar</p>
-        <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
-          {task.title}
-        </h1>
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-soft">
-          Cada cambio queda en el historial de la tarea, con el antes y el después.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Editar"
+        title={task.title}
+        backHref={`/tarea/${task.id}`}
+        backLabel="La tarea"
+      >
+        Cada cambio queda en el historial de la tarea, con el antes y el después.
+      </PageHeader>
 
       <EditarForm
         task={task}
@@ -61,10 +60,6 @@ export default async function EditarTareaPage({
       <div className="border-t border-line pt-6">
         <CancelarForm taskId={task.id} estaActiva={estaActiva} />
       </div>
-
-      <Link href={`/tarea/${task.id}`} className="btn-quiet w-full">
-        Volver sin guardar
-      </Link>
     </div>
   );
 }

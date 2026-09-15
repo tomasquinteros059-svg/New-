@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 import { redirect } from "next/navigation";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
@@ -38,15 +39,9 @@ export default async function MiembroPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="label">Persona</p>
-        <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
-          {person.full_name}
-        </h1>
-        <p className="mt-1 text-[0.9375rem] text-ink-soft">
-          {person.is_present ? "En turno" : "Fuera de turno"}
-        </p>
-      </header>
+      <PageHeader title={person.full_name} backHref="/equipo" backLabel="Equipo">
+        {person.is_present ? "En turno" : "Fuera de turno"}
+      </PageHeader>
 
       {person.id === userId ? (
         <Banner tone="info">
@@ -101,10 +96,6 @@ export default async function MiembroPage({ params }: { params: Promise<{ id: st
         El nombre y la presencia los maneja cada uno desde su propia pantalla de Cuenta.
         Desde acá solo se cambian el rol y el tope.
       </p>
-
-      <Link href="/equipo" className="btn-quiet w-full">
-        Volver al equipo
-      </Link>
     </div>
   );
 }

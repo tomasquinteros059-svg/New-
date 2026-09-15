@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { TeamRow, loadState } from "@/components/team-row";
 import { AssignButton } from "./assign-button";
 import { ReassignForm } from "./reassign-form";
+import { PageHeader } from "@/components/page-header";
 import { Banner } from "@/components/banner";
 import { EmptyState } from "@/components/empty-state";
 import type { TeamMember, Task } from "@/lib/types";
@@ -46,12 +46,12 @@ export default async function AsignarPage({ params }: { params: Promise<{ id: st
   if (task.status === "active") {
     return (
       <div className="space-y-6">
-        <header>
-          <p className="label">Pasar a otra persona</p>
-          <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
-            {task.title}
-          </h1>
-        </header>
+        <PageHeader
+          eyebrow="Pasar a otra persona"
+          title={task.title}
+          backHref={`/tarea/${task.id}`}
+          backLabel="La tarea"
+        />
 
         <Banner tone="info">
           No vuelve a la cola: pasa directo de una persona a la otra, así que nadie más
@@ -64,24 +64,20 @@ export default async function AsignarPage({ params }: { params: Promise<{ id: st
           <ReassignForm taskId={task.id} team={team} currentHolderId={task.assignee_id} />
         )}
 
-        <Link href={`/tarea/${task.id}`} className="btn-quiet w-full">
-          Cancelar
-        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="label">Asignar</p>
-        <h1 className="mt-1.5 font-display text-2xl leading-tight font-bold text-ink">
-          {task.title}
-        </h1>
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-soft">
-          Entra a la lista de quien elijas. No interrumpe lo que esté haciendo.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Asignar"
+        title={task.title}
+        backHref={`/tarea/${task.id}`}
+        backLabel="La tarea"
+      >
+        Entra a la lista de quien elijas. No interrumpe lo que esté haciendo.
+      </PageHeader>
 
       <Banner tone="info">
         El tope es un freno para quien toma trabajo, no para vos. Si hace falta, podés
@@ -109,9 +105,6 @@ export default async function AsignarPage({ params }: { params: Promise<{ id: st
         </ul>
       )}
 
-      <Link href={`/tarea/${task.id}`} className="btn-quiet w-full">
-        Cancelar
-      </Link>
     </div>
   );
 }

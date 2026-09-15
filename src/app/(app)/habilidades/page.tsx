@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { deleteSkill } from "@/lib/skills/actions";
 import { NuevaHabilidadForm } from "./habilidades-form";
+import { PageHeader } from "@/components/page-header";
 import { Banner } from "@/components/banner";
 import { EmptyState } from "@/components/empty-state";
 import type { Skill } from "@/lib/types";
@@ -42,12 +42,9 @@ export default async function HabilidadesPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold text-ink">Habilidades</h1>
-        <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">
-          Etiquetas para decir qué hace falta saber para una tarea.
-        </p>
-      </header>
+      <PageHeader title="Habilidades" backHref="/equipo" backLabel="Equipo">
+        Etiquetas para decir qué hace falta saber para una tarea.
+      </PageHeader>
 
       {notice ? <Banner tone={notice.tone}>{notice.text}</Banner> : null}
 
@@ -93,10 +90,6 @@ export default async function HabilidadesPage({
         las tenga TODAS. El supervisor puede asignarla igual a alguien que no las tenga,
         pero la app se lo va a decir.
       </p>
-
-      <Link href="/equipo" className="btn-quiet w-full">
-        Ir al equipo para repartirlas
-      </Link>
     </div>
   );
 }

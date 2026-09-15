@@ -45,7 +45,7 @@ export function SkillPicker({
         {skills.map((skill) => (
           <label
             key={skill.id}
-            className="relative cursor-pointer rounded-pill border border-line-strong bg-surface px-3.5 py-2 text-[0.9375rem] font-medium text-ink-soft transition-colors has-checked:border-brand-500 has-checked:bg-brand-50 has-checked:text-brand-700"
+            className="relative inline-flex min-h-11 cursor-pointer items-center rounded-pill border border-line-strong bg-surface px-4 text-[0.9375rem] font-medium text-ink-soft transition-colors has-checked:border-brand-500 has-checked:bg-brand-50 has-checked:text-brand-700"
           >
             <input
               type="checkbox"

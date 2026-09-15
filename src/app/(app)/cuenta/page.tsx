@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth/dal";
 import { CuentaForm } from "./cuenta-form";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PushToggle } from "@/components/push-toggle";
+import { PageHeader } from "@/components/page-header";
 import { signOut } from "./actions";
 
 export const metadata = { title: "Cuenta · Relevo" };
@@ -11,10 +12,9 @@ export default async function CuentaPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold text-ink">Cuenta</h1>
-        <p className="mt-1 text-[0.9375rem] text-ink-soft">{email}</p>
-      </header>
+      <PageHeader title="Cuenta" backHref="/mis-tareas" backLabel="Mis tareas">
+        {email}
+      </PageHeader>
 
       <CuentaForm fullName={profile.full_name} isPresent={profile.is_present} />
 

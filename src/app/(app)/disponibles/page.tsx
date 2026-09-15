@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireSession } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { AvailableTaskCard } from "@/components/available-task-card";
@@ -7,6 +6,7 @@ import { Banner } from "@/components/banner";
 import { RealtimeTasks } from "@/components/realtime-tasks";
 import { SearchBox } from "@/components/search-box";
 import { Pager } from "@/components/pager";
+import { Fab } from "@/components/fab";
 import type { QueueItem } from "@/lib/types";
 
 export const metadata = { title: "Disponibles · Relevo" };
@@ -85,12 +85,6 @@ export default async function DisponiblesPage({
         </Banner>
       ) : null}
 
-      {profile.role === "supervisor" ? (
-        <Link href="/tarea/nueva" className="btn-primary">
-          Crear tarea
-        </Link>
-      ) : null}
-
       {error ? (
         <Banner tone="bad">No pudimos cargar la cola. Recargá la página.</Banner>
       ) : tasks.length === 0 ? (
@@ -117,6 +111,8 @@ export default async function DisponiblesPage({
       )}
 
       <Pager page={pagina} pageSize={POR_PAGINA} total={total} q={busqueda} />
+
+      {profile.role === "supervisor" ? <Fab href="/tarea/nueva" label="Crear tarea" /> : null}
     </div>
   );
 }

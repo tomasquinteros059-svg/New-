@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSupervisor } from "@/lib/auth/dal";
 import { createClient } from "@/lib/supabase/server";
 import { AjustesForm } from "./ajustes-form";
+import { PageHeader } from "@/components/page-header";
 import { Banner } from "@/components/banner";
 import type { AppSettings } from "@/lib/types";
 
@@ -26,12 +27,9 @@ export default async function AjustesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold text-ink">Ajustes</h1>
-        <p className="mt-1 text-[0.9375rem] leading-relaxed text-ink-soft">
-          Cuánto puede esperar el trabajo antes de que la app avise.
-        </p>
-      </header>
+      <PageHeader title="Ajustes" backHref="/control" backLabel="Control">
+        Cuánto puede esperar el trabajo antes de que la app avise.
+      </PageHeader>
 
       <AjustesForm settings={data} />
 
@@ -41,12 +39,9 @@ export default async function AjustesPage() {
         los valores nuevos.
       </p>
 
-      <div className="space-y-3 border-t border-line pt-6">
+      <div className="border-t border-line pt-5">
         <Link href="/habilidades" className="btn-quiet w-full">
           Administrar habilidades
-        </Link>
-        <Link href="/control" className="btn-quiet w-full">
-          Volver a Control
         </Link>
       </div>
     </div>

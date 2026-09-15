@@ -229,8 +229,13 @@ src/
     api/cron/resumen/      Resumen diario por correo (lo llama Vercel Cron)
   lib/email/               Armado del correo (puro) y envío (un proveedor)
   lib/push/                Avisos al teléfono y suscripciones
+  manifest.ts              Manifiesto: hace la app instalable en el teléfono
+components/page-header.tsx Encabezado de pantalla interior, con el volver
+components/action-group.tsx Acciones secundarias agrupadas en dos columnas
 public/sw.js               Service worker: recibe los avisos y abre la pantalla
+scripts/generar-iconos.mjs Dibuja los iconos con los colores de la marca
 docs/prueba-manual.md      Lo que hay que probar a mano contra Supabase
+docs/apk.md                Instalar en el teléfono, y qué haría falta para un APK
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
@@ -335,6 +340,28 @@ con la service_role key al momento de enviar.
 **El push diario solo sale si hay algo atrasado.** Un aviso diario que dice que
 todo está en orden se silencia a la semana, y con él se silencian los que sí
 importan.
+
+**Una acción principal por pantalla, y una sola.** El detalle de una tarea
+llegó a tener cinco botones grises idénticos apilados. Con todo del mismo
+tamaño y color, nada es lo importante y hay que leer los cinco. Ahora: la
+acción que la persona vino a hacer va a todo el ancho y en color; el resto baja
+de jerarquía, se agrupa bajo una etiqueta que dice de quién son esas acciones,
+y entra en dos columnas.
+
+**El volver está arriba, no abajo.** Seis pantallas terminaban con un botón de
+«Volver» al final. Obligaba a recorrer la pantalla entera para salir y competía
+con la acción principal. Ahora el destino va en el encabezado, nombrado
+(«‹ Cola», «‹ Mis tareas»), y el botón del sistema sigue funcionando igual.
+
+**Crear una tarea es un botón flotante.** Era naranja y a todo el ancho en
+medio de la lista: empujaba la cola hacia abajo y competía con las tarjetas.
+Flotando queda al alcance del pulgar sin ocupar lugar en el flujo.
+
+**Nada se toca con menos de 44 píxeles de alto.** Verificado midiendo cada
+elemento tocable en el navegador, en los dos temas, no a ojo.
+
+**El contenido termina antes de la barra inferior.** La barra es adhesiva y no
+había espacio reservado: la última tarjeta quedaba tapada al llegar al final.
 
 **El tiempo real tiene respaldo.** Si el canal no conecta —Realtime apagado, la
 red del galpón, un proxy que corta WebSockets— cae a refrescar cada 30
@@ -468,6 +495,18 @@ explícita. Cuando entre, necesita su propio juego de políticas sobre
 `storage.objects`.
 
 ---
+
+## Instalarla en el teléfono
+
+Una vez desplegada, Relevo se instala desde el navegador: en Android, menú ⋮ →
+*Instalar aplicación*; en iPhone, Compartir → *Agregar a inicio*. Queda con su
+icono y abre a pantalla completa. En iPhone es además el requisito para que
+funcionen las notificaciones.
+
+No hay APK y no puede haberlo todavía: la aplicación se renderiza en el
+servidor, así que un paquete no puede llevarla adentro, y una TWA necesita una
+URL pública que hoy no existe. Los pasos exactos, para cuando esté desplegada,
+están en [`docs/apk.md`](docs/apk.md).
 
 ## Defectos encontrados en el QA y ya corregidos
 

@@ -1,4 +1,4 @@
-import { PRIORITY_CLASS, PRIORITY_LABEL, formatDateTime, timeAgo } from "@/lib/format";
+import { formatDateTime, timeAgo } from "@/lib/format";
 import type { Task } from "@/lib/types";
 
 /** La ficha de datos de una tarea. Separada para poder verla sin base de datos. */
@@ -29,24 +29,6 @@ export function TaskFacts({
         <Row label="Evidencia" value="Se pide al cerrar (Fase 4)" />
       ) : null}
     </dl>
-  );
-}
-
-export function TaskHeading({ task }: { task: Task }) {
-  return (
-    <div>
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="font-display text-2xl leading-tight font-bold text-ink">{task.title}</h1>
-        <span className={`pill mt-1 shrink-0 ${PRIORITY_CLASS[task.priority]}`}>
-          {PRIORITY_LABEL[task.priority]}
-        </span>
-      </div>
-      {task.description ? (
-        <p className="mt-3 text-[0.9375rem] leading-relaxed whitespace-pre-line text-ink-soft">
-          {task.description}
-        </p>
-      ) : null}
-    </div>
   );
 }
 

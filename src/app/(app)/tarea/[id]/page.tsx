@@ -6,7 +6,10 @@ import { ReleaseForm } from "./release-form";
 import { EvidenceUploader } from "./evidence-uploader";
 import { EvidenceList } from "@/components/evidence-list";
 import { Banner } from "@/components/banner";
-import { TaskFacts, TaskHeading } from "@/components/task-facts";
+import { TaskFacts } from "@/components/task-facts";
+import { PageHeader } from "@/components/page-header";
+import { ActionGroup } from "@/components/action-group";
+import { PRIORITY_CLASS, PRIORITY_LABEL } from "@/lib/format";
 import { formatDateTime } from "@/lib/format";
 import type { Profile, Task, TaskEvent } from "@/lib/types";
 
@@ -98,6 +101,19 @@ export default async function TaskPage({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title={task.title}
+        backHref={task.status === "available" ? "/disponibles" : "/mis-tareas"}
+        backLabel={task.status === "available" ? "Cola" : "Mis tareas"}
+      >
+        <span className={`pill ${PRIORITY_CLASS[task.priority]}`}>
+          Prioridad {PRIORITY_LABEL[task.priority].toLowerCase()}
+        </span>
+        {task.description ? (
+          <p className="mt-3 whitespace-pre-line">{task.description}</p>
+        ) : null}
+      </PageHeader>
+
       {aviso === "asignada" ? (
         <Banner tone={tope || turno ? "warn" : "good"}>
           Asignada a {assignee?.full_name ?? "esa persona"}.
@@ -134,8 +150,6 @@ export default async function TaskPage({
           {motivoCancelacion ? `: ${motivoCancelacion}` : "."}
         </Banner>
       ) : null}
-
-      <TaskHeading task={task} />
 
       <TaskFacts task={task} isMine={isMine} assigneeName={assignee?.full_name} />
 
@@ -176,27 +190,23 @@ export default async function TaskPage({
         </Banner>
       ) : null}
 
-      {task.status === "available" ? (
-        <div className="space-y-3">
-          {faltan.length === 0 ? <ClaimForm taskId={task.id} /> : null}
-          {isSupervisor ? (
-            <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet w-full">
-              Asignar a alguien
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
-      {isSupervisor && task.status === "active" ? (
-        <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet w-full">
-          Pasarle esta tarea a otro
-        </Link>
+      {/*
+        UNA acción principal por pantalla. Tomar o cerrar es lo que la persona
+        vino a hacer; todo lo demás baja de jerarquía y se agrupa abajo.
+      */}
+      {task.status === "available" && faltan.length === 0 ? (
+        <ClaimForm taskId={task.id} />
       ) : null}
 
       {isSupervisor && (task.status === "available" || task.status === "active") ? (
-        <Link href={`/tarea/${task.id}/editar`} className="btn-quiet w-full">
-          Editar o cancelar
-        </Link>
+        <ActionGroup label="Como supervisor">
+          <Link href={`/tarea/${task.id}/asignar`} className="btn-quiet">
+            {task.status === "available" ? "Asignar" : "Pasar a otro"}
+          </Link>
+          <Link href={`/tarea/${task.id}/editar`} className="btn-quiet">
+            Editar
+          </Link>
+        </ActionGroup>
       ) : null}
 
       {task.status === "active" && (isMine || isSupervisor) ? (
@@ -213,6 +223,11 @@ export default async function TaskPage({
           <EvidenceList taskId={task.id} since={task.assigned_at} />
 
           <CloseForm taskId={task.id} />
+
+          {/*
+            Soltar va DESPUÉS de cerrar y sin color: es la salida, no el
+            camino. Con los dos botones iguales, se tocaba el equivocado.
+          */}
           <ReleaseForm taskId={task.id} />
         </section>
       ) : null}
@@ -221,9 +236,6 @@ export default async function TaskPage({
         <EvidenceList taskId={task.id} since={task.assigned_at} />
       ) : null}
 
-      <Link href={task.status === "available" ? "/disponibles" : "/mis-tareas"} className="btn-quiet w-full">
-        Volver
-      </Link>
     </div>
   );
 }

@@ -34,11 +34,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between px-5 py-3.5">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between px-5 py-2.5">
           <Wordmark compact />
           <Link
             href="/cuenta"
-            className="flex items-center gap-2 rounded-pill px-2 py-1 -mr-2 transition-colors hover:bg-sunken"
+            className="-mr-2 flex min-h-11 items-center gap-2 rounded-pill px-3 transition-colors hover:bg-sunken"
           >
             <span
               aria-hidden
@@ -51,7 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-md flex-1 px-5 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-md flex-1 px-5 pt-5 pb-28">{children}</main>
 
       <Nav items={items} />
     </div>
