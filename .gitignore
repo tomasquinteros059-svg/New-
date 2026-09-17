@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# el demo se construye en CI, no se commitea
+/demo/dist
+
 # vercel
 .vercel
 

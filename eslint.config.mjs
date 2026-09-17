@@ -7,6 +7,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // El demo se compila a un bundle minificado: es código generado.
+    "demo/dist/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",

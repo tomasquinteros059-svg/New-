@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#191612" media="(prefers-color-scheme: dark)">
+<title>Relevo · demo</title>
+<link rel="icon" href="./icono-192.png">
+<link rel="apple-touch-icon" href="./icono-192.png">
+<link rel="stylesheet" href="./demo.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --font-archivo: "Archivo"; --font-public-sans: "Public Sans"; }
+</style>
+<script>
+  /* El tema elegido se aplica antes de pintar, igual que en la app. */
+  try { var t = localStorage.getItem("relevo-tema");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="./demo.js"></script>
+</body>
+</html>
