@@ -9,6 +9,7 @@
  * existen sin servidor.
  */
 import { build } from "esbuild";
+import { empaquetarFuentes } from "./fuentes.mjs";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -57,6 +58,8 @@ execFileSync(
   ["@tailwindcss/cli", "-i", resolve(aqui, "demo.css"), "-o", resolve(salida, "demo.css"), "--minify"],
   { cwd: raiz, stdio: "inherit" },
 );
+
+await empaquetarFuentes(salida);
 
 copyFileSync(resolve(aqui, "index.html"), resolve(salida, "index.html"));
 copyFileSync(resolve(raiz, "public/icono-192.png"), resolve(salida, "icono-192.png"));

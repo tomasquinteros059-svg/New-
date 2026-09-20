@@ -18,7 +18,7 @@ recursos="android/app/src/main"
 
 rm -rf "$recursos/assets"
 mkdir -p "$recursos/assets"
-cp demo/dist/* "$recursos/assets/"
+cp -r demo/dist/. "$recursos/assets/"
 
 mkdir -p "$recursos/res/mipmap-xxhdpi" "$recursos/res/mipmap-xxxhdpi"
 cp public/icono-192.png "$recursos/res/mipmap-xxhdpi/ic_launcher.png"

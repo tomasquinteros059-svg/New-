@@ -9,6 +9,8 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // El demo se compila a un bundle minificado: es código generado.
     "demo/dist/**",
+    // Y el APK se lo lleva adentro: es el mismo archivo generado, copiado.
+    "android/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
