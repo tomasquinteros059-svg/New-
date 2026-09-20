@@ -1,0 +1,84 @@
+name: Armar el APK
+
+# El APK no se puede compilar en cualquier máquina: hace falta el SDK de
+# Android. Los runners de GitHub ya lo traen, así que se compila acá y queda
+# publicado como Release, con una dirección de descarga que no cambia nunca:
+#
+#   https://github.com/<usuario>/<repo>/releases/latest/download/relevo-demo.apk
+on:
+  push:
+    branches: [claude/work-queue-capacity-app-slhotq, main]
+    paths:
+      - "android/**"
+      - "demo/**"
+      - "src/components/**"
+      - "src/app/globals.css"
+      - "src/lib/format.ts"
+      - "public/icono-*.png"
+      - ".github/workflows/apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: true
+
+jobs:
+  armar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Asegurar el SDK de Android
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+
+      - run: npm ci
+
+      - name: Preparar el contenido del APK
+        run: ./android/preparar.sh
+
+      - name: Compilar
+        working-directory: android
+        run: gradle --no-daemon assembleDebug
+
+      - name: Renombrar
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk relevo-demo.apk
+
+      # Copia de respaldo: se baja desde la pestaña Actions aunque el Release
+      # falle. Requiere estar con sesión iniciada en GitHub.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: relevo-demo-apk
+          path: relevo-demo.apk
+
+      - name: Publicar el Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Un único Release que se reemplaza en cada compilación, para que el
+          # enlace de descarga sea siempre el mismo.
+          gh release delete apk --yes --cleanup-tag || true
+          gh release create apk relevo-demo.apk \
+            --target "$GITHUB_SHA" \
+            --title "Relevo · APK para probar en el teléfono" \
+            --notes-file android/notas-release.md
+          echo "Publicado en: $(gh release view apk --json url --jq .url)"

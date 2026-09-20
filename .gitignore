@@ -43,3 +43,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Android: todo lo de acá se genera con android/preparar.sh o lo deja Gradle.
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/src/main/assets/
+/android/app/src/main/res/mipmap-*/
+/android/local.properties

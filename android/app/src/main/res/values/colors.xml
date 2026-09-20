@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Los mismos dos fondos que define globals.css, para que la pantalla no
+         pegue un flash blanco antes de que cargue la interfaz. -->
+    <color name="papel">#f4f1ea</color>
+</resources>

@@ -35,6 +35,9 @@ jobs:
       - run: npm ci
       - run: npm run demo
       - uses: actions/configure-pages@v5
+        with:
+          # Habilita Pages solo, sin que nadie tenga que entrar a Settings.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: demo/dist
