@@ -12,6 +12,13 @@ val compilacion = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 android {
     namespace = "cl.innovasoulsystem.relevo"
     compileSdk = 35
+    /*
+     * Fijado a propósito. Sin esto AGP elige su versión preferida, y si no
+     * está instalada sale a descargarla; cuando esa descarga necesita aceptar
+     * una licencia, el build se queda esperando una respuesta que en CI no
+     * va a llegar nunca.
+     */
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "cl.innovasoulsystem.relevo"

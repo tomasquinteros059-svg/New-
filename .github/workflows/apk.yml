@@ -28,6 +28,7 @@ concurrency:
 jobs:
   armar:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -47,9 +48,12 @@ jobs:
 
       - name: Asegurar el SDK de Android
         run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
           "$sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          # Si alguna licencia no quedó aceptada, AGP se cuelga pidiéndola.
+          ls -1 "$ANDROID_HOME/licenses"
 
       - run: npm ci
 
@@ -58,7 +62,12 @@ jobs:
 
       - name: Compilar
         working-directory: android
-        run: gradle --no-daemon assembleDebug
+        timeout-minutes: 12
+        # `< /dev/null` es lo que importa: si algo pide una respuesta por
+        # teclado, falla en el acto en vez de esperar hasta que corten el job.
+        run: >
+          gradle --no-daemon --console=plain --stacktrace assembleDebug
+          < /dev/null
 
       - name: Renombrar
         run: cp android/app/build/outputs/apk/debug/app-debug.apk relevo-demo.apk

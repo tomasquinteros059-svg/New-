@@ -42,3 +42,15 @@ En cada `push` se publica solo en GitHub Pages: ver `.github/workflows/demo.yml`
 Si el demo se desactualiza respecto de la app es porque alguien cambió una
 pantalla sin cambiar su componente. Los componentes son compartidos; las
 pantallas del demo, no.
+
+## También hay un APK
+
+Este mismo demo viaja adentro de un APK que compila GitHub en cada push, para
+poder instalarlo en el teléfono como una app en vez de abrirlo en el navegador:
+
+```
+https://github.com/<usuario>/<repo>/releases/latest/download/relevo-demo.apk
+```
+
+Las advertencias de más arriba valen igual: no hay sesión y nada se guarda.
+Cómo está armado, en [`../docs/apk.md`](../docs/apk.md).

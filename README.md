@@ -235,7 +235,8 @@ components/action-group.tsx Acciones secundarias agrupadas en dos columnas
 public/sw.js               Service worker: recibe los avisos y abre la pantalla
 scripts/generar-iconos.mjs Dibuja los iconos con los colores de la marca
 docs/prueba-manual.md      Lo que hay que probar a mano contra Supabase
-docs/apk.md                Instalar en el teléfono, y qué haría falta para un APK
+docs/apk.md                Las dos formas de instalarla en el teléfono
+android/                   Envoltorio Android: el APK que compila GitHub
     (app)/tarea/nueva/     Crear tarea (solo supervisor)
     (app)/equipo/          Padrón del equipo (solo supervisor)
     (app)/cuenta/          Nombre, presencia, cerrar sesión
@@ -503,10 +504,22 @@ Una vez desplegada, Relevo se instala desde el navegador: en Android, menú ⋮ 
 icono y abre a pantalla completa. En iPhone es además el requisito para que
 funcionen las notificaciones.
 
-No hay APK y no puede haberlo todavía: la aplicación se renderiza en el
-servidor, así que un paquete no puede llevarla adentro, y una TWA necesita una
-URL pública que hoy no existe. Los pasos exactos, para cuando esté desplegada,
-están en [`docs/apk.md`](docs/apk.md).
+### El APK
+
+Para probarla antes de desplegar nada hay un APK, que compila GitHub en cada
+push y queda en una dirección de descarga que no cambia:
+
+```
+https://github.com/<usuario>/<repo>/releases/latest/download/relevo-demo.apk
+```
+
+Se abre esa dirección desde el teléfono y se instala. Adentro lleva la interfaz
+real con datos de prueba: sirve para recorrer las pantallas y decidir qué
+cambiar, pero no tiene sesión y no guarda nada.
+
+El día que Relevo esté desplegado, poniendo la dirección en la constante
+`URL_REMOTA` de `android/` el mismo APK pasa a abrir la aplicación de verdad.
+Todo eso está en [`docs/apk.md`](docs/apk.md).
 
 ## Defectos encontrados en el QA y ya corregidos
 

@@ -1,99 +1,113 @@
 # Cómo poner Relevo en el teléfono
 
-## Hoy: instalarla desde el navegador (1 minuto, sin APK)
+Hay dos caminos y los dos están armados. El APK es el más directo para probar;
+la instalación desde el navegador es la que sirve cuando la app esté desplegada
+de verdad.
+
+---
+
+## 1. El APK (para probar ahora)
+
+Lo compila GitHub en cada push y queda publicado en una dirección que no cambia:
+
+```
+https://github.com/<usuario>/<repo>/releases/latest/download/relevo-demo.apk
+```
+
+Se abre esa dirección **desde el teléfono**, se instala, y queda con ícono
+propio. Android pide permiso para instalar desde fuera de la tienda: es normal y
+se acepta una vez.
+
+### Qué lleva adentro
+
+La interfaz real de Relevo con datos de prueba en memoria. Los mismos
+componentes que corren en producción, no una maqueta aparte. Anda sin internet y
+sin servidor.
+
+Lo que **no** lleva: sesión, base de datos, persistencia. Al cerrarla vuelve al
+estado inicial. Los avisos al teléfono y la subida de evidencia necesitan
+servidor y no funcionan.
+
+### Cómo está armado
+
+`android/` es un envoltorio de unas 150 líneas. Tres decisiones que importan:
+
+- **`WebViewAssetLoader`, no `file://`.** Los archivos del APK se sirven bajo un
+  origen `https` real. Con `file://` no andarían ni los módulos de JavaScript ni
+  el almacenamiento local, y el tema oscuro elegido a mano se perdería al cerrar
+  la app.
+- **El botón de atrás navega.** Sin eso, atrás cierra la aplicación desde
+  cualquier pantalla.
+- **Los enlaces externos salen al navegador.** Sin eso, el usuario queda
+  atrapado en una página ajena y sin barra de direcciones para volver.
+
+Está firmado con la clave de depuración. Eso alcanza para instalarlo a mano; no
+alcanza para repartirlo formalmente ni para publicarlo en Play Store.
+
+### Para compilarlo en tu computador
+
+Hace falta el SDK de Android. Si lo tenés:
+
+```bash
+./android/preparar.sh
+cd android && gradle assembleDebug
+```
+
+Queda en `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### El día que Relevo esté desplegado
+
+En `android/app/src/main/java/.../PantallaPrincipal.java` hay una constante:
+
+```java
+private static final String URL_REMOTA = "";
+```
+
+Poniendo ahí la dirección desplegada (`"https://relevo.vercel.app/"`), **este
+mismo APK** pasa a abrir la aplicación de verdad, con cuentas y base de datos.
+No hay que tocar nada más. Conviene entonces leer también la sección de
+`assetlinks.json` más abajo.
+
+---
+
+## 2. Instalar desde el navegador (cuando esté desplegada)
 
 Relevo es una aplicación web instalable. Una vez desplegada, en el teléfono:
 
 - **Android (Chrome)**: abrir la URL → menú ⋮ → *Instalar aplicación*.
 - **iPhone (Safari)**: abrir la URL → Compartir → *Agregar a inicio*.
 
-Queda con su icono, abre a pantalla completa sin barra de direcciones, y en
+Queda con su ícono, abre a pantalla completa sin barra de direcciones, y en
 iPhone es **el requisito** para que funcionen las notificaciones.
 
-Esto no es un premio de consuelo: para una app que necesita sesión, datos en
-vivo y permisos por fila, es la forma correcta. No hay tienda, no hay revisión,
-y una corrección está en todos los teléfonos apenas se despliega.
+Para una app con sesión, datos en vivo y permisos por fila, esta es la forma
+correcta: no hay tienda, no hay revisión, y una corrección llega a todos los
+teléfonos apenas se despliega.
 
 ---
 
-## Si aun así hace falta un `.apk`
+## `assetlinks.json`
 
-Un APK para esta app no puede empaquetar la aplicación adentro: Relevo se
-renderiza en el servidor, con sesión por cookie y permisos en la base de datos.
-No hay nada estático que meter en el paquete.
+Solo hace falta si el APK apunta a una URL desplegada (el caso de `URL_REMOTA`
+lleno, o una TWA hecha con Bubblewrap). Sirve para que el sitio reconozca a la
+app y esta abra sin la barra del navegador.
 
-Lo que sí se puede es una **TWA** (*Trusted Web Activity*): un APK delgado que
-abre la web a pantalla completa, sin barra del navegador, con el icono y el
-nombre de la app. Es exactamente lo que hacen muchas apps de tienda.
-
-### Requisito que hoy no se cumple
-
-La TWA **necesita una URL HTTPS pública**. Es decir: primero hay que desplegar
-en Vercel. Un APK armado antes apuntaría a `localhost` y en el teléfono no
-abriría nada.
-
-### Los pasos, una vez desplegada
-
-En tu computador, con Node y el JDK instalados:
-
-```bash
-npm install -g @bubblewrap/cli
-bubblewrap init --manifest https://TU-DOMINIO/manifest.webmanifest
-bubblewrap build
-```
-
-`bubblewrap init` lee el manifiesto que ya está en el repositorio
-(`src/app/manifest.ts`): nombre, icono, colores y pantalla de inicio salen de
-ahí. La primera corrida ofrece descargar el SDK de Android y crear la clave de
-firma; guardá esa clave, porque sin ella no vas a poder publicar una
-actualización del mismo APK nunca más.
-
-El resultado es `app-release-signed.apk`.
-
-### El paso que casi todos se saltan
-
-Para que el APK abra **sin la barra del navegador**, el sitio tiene que
-reconocer a esa app. Hay que publicar en
-`https://TU-DOMINIO/.well-known/assetlinks.json`:
+Va en `public/.well-known/assetlinks.json` y se despliega solo:
 
 ```json
 [{
   "relation": ["delegate_permission/common.handle_all_urls"],
   "target": {
     "namespace": "android_app",
-    "package_name": "cl.tuempresa.relevo",
-    "sha256_cert_fingerprints": ["LA HUELLA QUE IMPRIME bubblewrap build"]
+    "package_name": "cl.innovasoulsystem.relevo",
+    "sha256_cert_fingerprints": ["LA HUELLA DE LA CLAVE CON QUE SE FIRMÓ"]
   }
 }]
 ```
 
-En este proyecto, ese archivo va en `public/.well-known/assetlinks.json` y se
-despliega solo. Sin él, el APK abre pero muestra la barra de direcciones arriba
-— funciona, pero se nota que es una web.
+La huella de la clave de depuración se saca con:
 
-### Para descargarlo desde GitHub
-
-Subí el `.apk` como adjunto de una *Release*:
-
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore \
+  -alias androiddebugkey -storepass android -keypass android
 ```
-GitHub → Releases → Draft a new release → Attach binaries
-```
-
-El enlace de descarga queda público y andá directo desde el teléfono. Android
-va a pedir permiso para instalar desde fuera de la tienda: es normal y se
-acepta una vez.
-
----
-
-## Por qué no te lo puedo dejar armado
-
-Dos motivos, y el segundo es el que manda:
-
-1. **No hay SDK de Android en este entorno.** Hay JDK 21 y Gradle, pero faltan
-   `sdkmanager`, `aapt2`, `apksigner` y `zipalign`.
-2. **No hay a dónde apuntar.** La aplicación no está desplegada: no existe la
-   URL que el APK tiene que abrir. Cualquier APK que te mandara hoy abriría una
-   pantalla en blanco.
-
-El punto 1 se resuelve descargando cosas. El punto 2 se resuelve desplegando, y
-eso depende de tus cuentas.
