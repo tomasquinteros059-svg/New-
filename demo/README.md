@@ -45,8 +45,8 @@ pantallas del demo, no.
 
 ## También hay un APK
 
-Este mismo demo viaja adentro de un APK que compila GitHub en cada push, para
-poder instalarlo en el teléfono como una app en vez de abrirlo en el navegador:
+Este mismo demo viaja adentro de un APK que compila GitHub en cada push. Es la
+forma más directa de verlo en el teléfono, y no hace falta habilitar Pages:
 
 ```
 https://github.com/<usuario>/<repo>/releases/latest/download/relevo-demo.apk

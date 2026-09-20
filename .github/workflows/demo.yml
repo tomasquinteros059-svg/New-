@@ -3,15 +3,14 @@ name: Publicar el demo
 # El demo es la única parte de Relevo que se puede ver sin base de datos ni
 # sesión: son los componentes reales con datos de prueba en memoria. Se publica
 # en GitHub Pages para poder abrirlo desde el teléfono.
+#
+# Se dispara a mano, no en cada push. GitHub Pages hay que habilitarlo una vez
+# desde Settings → Pages → Source: GitHub Actions; el token de un workflow no
+# tiene permiso para habilitarlo solo. Mientras no esté habilitado, correr esto
+# en cada push solo dejaría un error rojo en cada commit.
+#
+# Para el teléfono no hace falta: para eso está el APK (.github/workflows/apk.yml).
 on:
-  push:
-    branches: [claude/work-queue-capacity-app-slhotq, main]
-    paths:
-      - "demo/**"
-      - "src/components/**"
-      - "src/app/globals.css"
-      - "src/lib/format.ts"
-      - ".github/workflows/demo.yml"
   workflow_dispatch:
 
 permissions:
@@ -35,9 +34,6 @@ jobs:
       - run: npm ci
       - run: npm run demo
       - uses: actions/configure-pages@v5
-        with:
-          # Habilita Pages solo, sin que nadie tenga que entrar a Settings.
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: demo/dist
